@@ -1,0 +1,99 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven {
+            name = "CleanroomMC"
+            url = "https://maven.cleanroommc.com"
+        }
+        maven {
+            name = "MinecraftForge"
+            url = "https://maven.minecraftforge.net/"
+            metadataSources {
+                mavenPom()
+                artifact()
+            }
+        }
+        maven {
+            name = "Sponge"
+            url = "https://repo.spongepowered.org/maven"
+            metadataSources {
+                mavenPom()
+                artifact()
+            }
+        }
+        maven {
+            name = "Sponge"
+            url = "https://repo.spongepowered.org/maven"
+        }
+        maven {
+            name = "FirstDarkDev"
+            url = "https://maven.firstdarkdev.xyz/releases/"
+        }
+        maven {
+            name = "WagYourMaven"
+            url = "https://maven.wagyourtail.xyz/releases"
+        }
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
+    repositories {
+        maven {
+            name = "CleanroomMC"
+            url = "https://maven.cleanroommc.com"
+        }
+        maven {
+            name = "MinecraftForge"
+            url = "https://maven.minecraftforge.net/"
+            metadataSources {
+                mavenPom()
+                artifact()
+            }
+        }
+        maven {
+            name = "Sponge"
+            url = "https://repo.spongepowered.org/maven"
+            metadataSources {
+                mavenPom()
+                artifact()
+            }
+        }
+        maven {
+            name = "CurseMaven"
+            url = "https://cursemaven.com"
+        }
+        maven {
+            name = "CleanroomCurseMaven"
+            url = "https://curse.cleanroommc.com"
+        }
+        maven {
+            name = "ModMaven"
+            url = "https://modmaven.dev"
+        }
+        maven {
+            name = "CoFH"
+            url = "https://maven.covers1624.net"
+        }
+        maven {
+            name = "JitPack"
+            url = "https://www.jitpack.io"
+            content {
+                includeGroupByRegex("com\\.github\\..*")
+            }
+        }
+        maven {
+            name = "FirstDarkDev"
+            url = "https://maven.firstdarkdev.xyz/releases/"
+        }
+        maven {
+            name = "WagYourMaven"
+            url = "https://maven.wagyourtail.xyz/releases"
+        }
+        mavenCentral()
+        mavenLocal()
+    }
+}
+
+rootProject.name = "AppliedThermal"

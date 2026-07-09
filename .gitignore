@@ -1,0 +1,13 @@
+.gradle/
+build/
+run/
+out/
+*.iml
+.idea/
+.vscode/
+
+# Local development and investigation artifacts
+/.agents/
+/.codex/
+/ae2/
+/hs_err_pid*.log

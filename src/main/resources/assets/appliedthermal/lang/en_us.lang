@@ -1,0 +1,17 @@
+item.appliedthermal.pattern_provider_augment.name=Pattern Provider Augment
+info.appliedthermal.augment.pattern_provider.0=Adds an internal AE2S pattern provider to Thermal machines.
+info.appliedthermal.augment.pattern_provider.a.0=Connect adjacent AE2S cables to expose processing patterns.
+info.appliedthermal.augment.pattern_provider.c.0=Only valid for Thermal Expansion machines.
+tab.appliedthermal.pattern_provider=Pattern Provider
+tab.appliedthermal.flux=Flux Interface
+tab.appliedthermal.open=Open Window
+tab.appliedthermal.output_return.on=Return On
+tab.appliedthermal.output_return.off=Return Off
+gui.appliedthermal.pattern_provider=Applied Thermal Pattern Provider
+gui.appliedthermal.patterns=Processing Patterns
+gui.appliedthermal.flux=Applied Thermal Flux Induction
+gui.appliedthermal.flux.card=Induction Card
+gui.appliedthermal.output_return=Return Outputs
+gui.appliedthermal.output_return.desc=Insert items from Thermal output slots back into the connected AE2S network.
+gui.appliedthermal.output_return.on=Return: On
+gui.appliedthermal.output_return.off=Return: Off

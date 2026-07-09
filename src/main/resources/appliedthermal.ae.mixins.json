@@ -1,0 +1,14 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "com.recursivepineapple.appliedthermal.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "plugin": "com.recursivepineapple.appliedthermal.core.AppliedThermalMixinPlugin",
+  "mixins": [
+    "MixinAEGuiHandler",
+    "MixinMouseTweaksGuiContainer2"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

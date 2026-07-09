@@ -1,0 +1,150 @@
+plugins {
+    id "java"
+    id "java-library"
+    id "xyz.wagyourtail.unimined" version "1.4.23-kappa"
+}
+
+group = mod_group
+version = mod_version
+
+base {
+    archivesName = mod_archives_name
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 8
+}
+
+repositories {
+    mavenLocal()
+    maven {
+        name = "CleanroomMC"
+        url = "https://maven.cleanroommc.com"
+    }
+    maven {
+        name = "MinecraftForge"
+        url = "https://maven.minecraftforge.net/"
+        metadataSources {
+            mavenPom()
+            artifact()
+        }
+    }
+    maven {
+        name = "Sponge"
+        url = "https://repo.spongepowered.org/maven"
+        metadataSources {
+            mavenPom()
+            artifact()
+        }
+    }
+    maven {
+        name = "CurseMaven"
+        url = "https://cursemaven.com"
+    }
+    maven {
+        name = "CleanroomCurseMaven"
+        url = "https://curse.cleanroommc.com"
+    }
+    maven {
+        name = "ModMaven"
+        url = "https://modmaven.dev"
+    }
+    maven {
+        name = "CoFH"
+        url = "https://maven.covers1624.net"
+    }
+    maven {
+        name = "JitPack"
+        url = "https://www.jitpack.io"
+        content {
+            includeGroupByRegex("com\\.github\\..*")
+        }
+    }
+    maven {
+        name = "FirstDarkDev"
+        url = "https://maven.firstdarkdev.xyz/releases/"
+    }
+    maven {
+        name = "WagYourMaven"
+        url = "https://maven.wagyourtail.xyz/releases"
+    }
+    mavenCentral()
+}
+
+configurations {
+    modCompileOnly
+    compileOnly.extendsFrom(modCompileOnly)
+    modRuntimeOnly
+    runtimeOnly.extendsFrom(modRuntimeOnly)
+}
+
+unimined.minecraft {
+    version "1.12.2"
+
+    mappings {
+        mcp("stable", "39-1.12")
+    }
+
+    cleanroom {
+        loader "0.5.14-alpha"
+        runs.auth.username = "Dev"
+        runs.all {
+            systemProperty("crl.dev.mixin", "appliedthermal.ae.mixins.json")
+            systemProperty("mixin.debug.export", "true")
+            systemProperty("fml.coreMods.load", "com.recursivepineapple.appliedthermal.core.AppliedThermalCore")
+        }
+    }
+
+    defaultRemapJar = true
+
+    mods {
+        remap(configurations.modCompileOnly)
+        remap(configurations.modRuntimeOnly)
+    }
+}
+
+dependencies {
+    compileOnly "com.cleanroommc:sponge-mixin:0.20.12+mixin.0.8.7"
+    compileOnly "zone.rong:mixinbooter:10.7"
+
+    modCompileOnly "com.github.FormlessDragon:Applied-Energistics-2-Supergiant:v1.0.9:dev"
+    modCompileOnly "curse.maven:CoFHCore-69162:2920433"
+    modCompileOnly "curse.maven:ThermalFoundation-222880:2926428"
+    modCompileOnly "curse.maven:ThermalExpansion-69163:2926431"
+    modCompileOnly "cofh:RedstoneFlux:1.12-2.1.0.+:universal"
+    modCompileOnly "curse.maven:codechicken-lib-1-8-242818:2779848"
+    modCompileOnly "mezz:jei:4.31.2"
+}
+
+processResources {
+    inputs.property("mod_id", mod_id)
+    inputs.property("mod_name", mod_name)
+    inputs.property("mod_version", mod_version)
+    inputs.property("mod_description", mod_description)
+
+    filesMatching(["mcmod.info", "pack.mcmeta"]) {
+        expand(
+            mod_id: mod_id,
+            mod_name: mod_name,
+            mod_version: mod_version,
+            mod_description: mod_description
+        )
+    }
+}
+
+jar {
+    manifest {
+        attributes(
+            "FMLCorePlugin": "com.recursivepineapple.appliedthermal.core.AppliedThermalCore",
+            "FMLCorePluginContainsFMLMod": "true",
+            "ForceLoadAsMod": "true"
+        )
+    }
+}
