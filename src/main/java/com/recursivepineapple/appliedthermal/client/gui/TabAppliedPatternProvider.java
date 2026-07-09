@@ -14,7 +14,7 @@ import net.minecraft.tileentity.TileEntity;
 
 public final class TabAppliedPatternProvider extends TabBase {
 
-    private static final String PATTERN_PROVIDER_SPRITE = "ae2:block/pattern_provider";
+    private static final String PATTERN_PROVIDER_SPRITE = "appliedenergistics2:blocks/interface";
 
     private final AppliedThermalProviderAttachment attachment;
     private final TileEntity tile;
@@ -23,7 +23,7 @@ public final class TabAppliedPatternProvider extends TabBase {
     public TabAppliedPatternProvider(GuiContainerCore gui, AppliedThermalMachine machine) {
         super(gui, 1);
         this.attachment = machine.appliedthermal$getProviderAttachment();
-        this.tile = this.attachment.getTileEntity();
+        this.tile = this.attachment.getTile();
         this.maxWidth = this.minWidth;
         this.maxHeight = this.minHeight;
         this.backgroundColor = 0x51456B;
@@ -51,7 +51,7 @@ public final class TabAppliedPatternProvider extends TabBase {
     @Override
     public boolean onMousePressed(int mouseX, int mouseY, int mouseButton) throws IOException {
         if (mouseButton == 0 && openRequestCooldown == 0 && tile.hasWorld()) {
-            openRequestCooldown = 4;
+            openRequestCooldown = 1;
             GuiContainerCore.playClickSound(0.8F);
             ATNetwork.CHANNEL.sendToServer(new MessageOpenPatternProviderGui(tile.getPos()));
         }

@@ -26,7 +26,7 @@ public final class AppliedThermalCore implements IFMLLoadingPlugin, IEarlyMixinL
 
     @Override
     public boolean shouldMixinConfigQueue(Context context) {
-        return AE_MIXIN_CONFIG.equals(context.mixinConfig()) && context.isModPresent("ae2");
+        return AE_MIXIN_CONFIG.equals(context.mixinConfig()) && context.isModPresent("appliedenergistics2");
     }
 
     @Override

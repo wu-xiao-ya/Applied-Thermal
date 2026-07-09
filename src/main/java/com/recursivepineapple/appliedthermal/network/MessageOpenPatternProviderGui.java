@@ -1,6 +1,8 @@
 package com.recursivepineapple.appliedthermal.network;
 
-import com.recursivepineapple.appliedthermal.AppliedThermal;
+import appeng.api.util.AEPartLocation;
+import appeng.core.sync.GuiBridge;
+import appeng.util.Platform;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -43,8 +45,7 @@ public final class MessageOpenPatternProviderGui implements IMessage {
                 TileEntity tile = player.world.getTileEntity(message.pos);
                 if (tile instanceof AppliedThermalMachine
                     && ((AppliedThermalMachine) tile).appliedthermal$hasPatternProviderAugment()) {
-                    player.openGui(AppliedThermal.instance, ATGuiIds.PATTERN_PROVIDER, player.world,
-                        message.pos.getX(), message.pos.getY(), message.pos.getZ());
+                    Platform.openGUI(player, tile, AEPartLocation.INTERNAL, GuiBridge.GUI_INTERFACE);
                 }
             });
             return null;

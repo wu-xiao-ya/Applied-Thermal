@@ -6,9 +6,5 @@ public interface AppliedThermalMachine {
 
     AppliedThermalProviderAttachment appliedthermal$getProviderAttachment();
 
-    AppliedThermalFluxAttachment appliedthermal$getFluxAttachment();
-
     boolean appliedthermal$hasPatternProviderAugment();
-
-    boolean appliedthermal$hasFluxInductionSupport();
 }

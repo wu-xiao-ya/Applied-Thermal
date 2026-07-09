@@ -38,6 +38,10 @@ public final class MessageToggleOutputReturn implements IMessage {
         @Override
         public IMessage onMessage(MessageToggleOutputReturn message, MessageContext ctx) {
             ctx.getServerHandler().player.getServerWorld().addScheduledTask(() -> {
+                if (message.pos == null
+                    || ctx.getServerHandler().player.getDistanceSq(message.pos) > 64.0D) {
+                    return;
+                }
                 TileEntity tile = ctx.getServerHandler().player.world.getTileEntity(message.pos);
                 if (tile instanceof AppliedThermalMachine) {
                     AppliedThermalMachine machine = (AppliedThermalMachine) tile;

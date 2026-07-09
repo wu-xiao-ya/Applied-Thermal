@@ -1,14 +1,11 @@
 package com.recursivepineapple.appliedthermal.integration.thermal;
 
-import ae2.api.upgrades.Upgrades;
-import ae2.core.AEConfig;
-import ae2.core.definitions.AEItems;
+import appeng.api.config.Upgrades;
 import cofh.thermalexpansion.block.machine.TileMachineBase;
 import com.recursivepineapple.appliedthermal.AppliedThermal;
-import com.recursivepineapple.appliedthermal.integration.appflux.AppFluxCompat;
 import com.recursivepineapple.appliedthermal.init.ATItems;
 import java.util.HashSet;
-import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 
 public final class ThermalMachineAugments {
 
@@ -23,12 +20,8 @@ public final class ThermalMachineAugments {
                 validAugments.add(PATTERN_PROVIDER_AUGMENT);
             }
         }
-        Upgrades.add(AEItems.PATTERN_EXPANSION_CARD.item(), ATItems.getPatternProviderAugment(),
-            AEConfig.instance().getPatternProviderExpansionCardLimit());
-        Upgrades.add(AEItems.PSEUDO_CRAFTING_CARD.item(), ATItems.getPatternProviderAugment(), 1);
-        Item inductionCard = AppFluxCompat.bridge().getInductionCardItem();
-        if (inductionCard != null) {
-            Upgrades.add(inductionCard, ATItems.getPatternProviderAugment(), 1, "group.pattern_provider.name");
-        }
+        ItemStack provider = new ItemStack(ATItems.getPatternProviderAugment());
+        Upgrades.PATTERN_EXPANSION.registerItem(provider, 3);
+        Upgrades.CRAFTING.registerItem(provider, 1);
     }
 }

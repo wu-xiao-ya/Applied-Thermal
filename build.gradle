@@ -6,6 +6,54 @@ plugins {
 
 group = mod_group
 version = mod_version
+def enableFluxAppliedRuntime = providers.gradleProperty("withFluxApplied")
+    .map { it.toBoolean() }
+    .orElse(false)
+    .get()
+
+def verifiedRemoteFile = { String fileName, String url, String expectedSha256 ->
+    File cacheDir = new File(gradle.gradleUserHomeDir, "caches/appliedthermal")
+    File target = new File(cacheDir, fileName)
+    cacheDir.mkdirs()
+
+    def sha256 = { File file ->
+        def digest = java.security.MessageDigest.getInstance("SHA-256")
+        file.withInputStream { stream ->
+            byte[] buffer = new byte[8192]
+            int read
+            while ((read = stream.read(buffer)) >= 0) {
+                digest.update(buffer, 0, read)
+            }
+        }
+        digest.digest().collect { String.format("%02X", it) }.join()
+    }
+
+    if (!target.isFile() || !sha256(target).equalsIgnoreCase(expectedSha256)) {
+        logger.lifecycle("Downloading ${fileName}")
+        File temporary = new File(cacheDir, "${fileName}.part")
+        temporary.delete()
+        new URL(url).withInputStream { input ->
+            temporary.withOutputStream { output -> output << input }
+        }
+        String actual = sha256(temporary)
+        if (!actual.equalsIgnoreCase(expectedSha256)) {
+            temporary.delete()
+            throw new GradleException("SHA-256 mismatch for ${fileName}: expected ${expectedSha256}, got ${actual}")
+        }
+        java.nio.file.Files.move(
+            temporary.toPath(),
+            target.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
+    }
+    return target
+}
+
+def ae2UelDevJar = verifiedRemoteFile(
+    "ae2-uel-v0.56.7-dev.jar",
+    "https://github.com/AE2-UEL/Applied-Energistics-2/releases/download/v0.56.7/ae2-uel-v0.56.7-dev.jar",
+    "8B1B982AC2CB905B89B17740BC2118BE36C5C2EF60838C6A36C0E198CEC57DBD"
+)
 
 base {
     archivesName = mod_archives_name
@@ -24,6 +72,9 @@ tasks.withType(JavaCompile).configureEach {
 
 repositories {
     mavenLocal()
+    flatDir {
+        dirs new File(gradle.gradleUserHomeDir, "caches/appliedthermal")
+    }
     maven {
         name = "CleanroomMC"
         url = "https://maven.cleanroommc.com"
@@ -99,6 +150,16 @@ unimined.minecraft {
             systemProperty("crl.dev.mixin", "appliedthermal.ae.mixins.json")
             systemProperty("mixin.debug.export", "true")
             systemProperty("fml.coreMods.load", "com.recursivepineapple.appliedthermal.core.AppliedThermalCore")
+            systemProperty(
+                "net.minecraftforge.gradle.GradleStart.srg.notch-srg",
+                new File(gradle.gradleUserHomeDir,
+                    "caches/minecraft/de/oceanlabs/mcp/mcp_stable/39/1.12.2/srgs/notch-srg.srg").absolutePath
+            )
+            systemProperty(
+                "net.minecraftforge.gradle.GradleStart.csvDir",
+                new File(gradle.gradleUserHomeDir,
+                    "caches/minecraft/de/oceanlabs/mcp/mcp_stable/39").absolutePath
+            )
         }
     }
 
@@ -114,13 +175,39 @@ dependencies {
     compileOnly "com.cleanroommc:sponge-mixin:0.20.12+mixin.0.8.7"
     compileOnly "zone.rong:mixinbooter:10.7"
 
-    modCompileOnly "com.github.FormlessDragon:Applied-Energistics-2-Supergiant:v1.0.9:dev"
+    compileOnly files(ae2UelDevJar)
+    modRuntimeOnly "curse.maven:ae2-extended-life-570458:6302098"
     modCompileOnly "curse.maven:CoFHCore-69162:2920433"
     modCompileOnly "curse.maven:ThermalFoundation-222880:2926428"
     modCompileOnly "curse.maven:ThermalExpansion-69163:2926431"
     modCompileOnly "cofh:RedstoneFlux:1.12-2.1.0.+:universal"
-    modCompileOnly "curse.maven:codechicken-lib-1-8-242818:2779848"
     modCompileOnly "mezz:jei:4.31.2"
+
+    modRuntimeOnly "curse.maven:CoFHCore-69162:2920433"
+    modRuntimeOnly "curse.maven:ThermalFoundation-222880:2926428"
+    modRuntimeOnly "curse.maven:ThermalExpansion-69163:2926431"
+    modRuntimeOnly "curse.maven:CoFHWorld-271384:2567263"
+    modRuntimeOnly "cofh:RedstoneFlux:1.12-2.1.0.+:universal"
+    modRuntimeOnly "curse.maven:codechicken-lib-1-8-242818:2779848"
+
+}
+
+if (enableFluxAppliedRuntime) {
+    verifiedRemoteFile(
+        "flux_applied-1.0.0.jar",
+        "https://github.com/NNYYOONNIIOO/Flux_Applied/releases/download/1.0.0/flux_applied-1.0.0.jar",
+        "42A2AF60B7F53EFCFE0AA9A63205295BB46C051ABBFAD533CD863AECBB647566"
+    )
+    verifiedRemoteFile(
+        "terminal_interaction_integration-1.0.jar",
+        "https://github.com/NNYYOONNIIOO/terminal_interaction_integration/releases/download/1.0.0/"
+            + "terminal_interaction_integration-1.0.jar",
+        "3C6ED9F22F46BEE7717FA8FACF86D0F0EB95E82982BFDA20E1FD7F4F0D843C43"
+    )
+    dependencies.add("modCompileOnly", "local.appliedthermal:flux_applied:1.0.0")
+    dependencies.add("modCompileOnly", "local.appliedthermal:terminal_interaction_integration:1.0")
+    dependencies.add("modRuntimeOnly", "local.appliedthermal:flux_applied:1.0.0")
+    dependencies.add("modRuntimeOnly", "local.appliedthermal:terminal_interaction_integration:1.0")
 }
 
 processResources {

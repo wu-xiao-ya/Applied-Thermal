@@ -1,106 +1,137 @@
 package com.recursivepineapple.appliedthermal.provider;
 
-import ae2.api.config.Actionable;
-import ae2.api.implementations.blockentities.PatternContainerGroup;
-import ae2.api.networking.GridFlags;
-import ae2.api.networking.GridHelper;
-import ae2.api.networking.IGrid;
-import ae2.api.networking.IGridNode;
-import ae2.api.networking.IGridNodeListener;
-import ae2.api.networking.IInWorldGridNodeHost;
-import ae2.api.networking.IManagedGridNode;
-import ae2.api.networking.crafting.ICraftingProvider;
-import ae2.api.networking.security.IActionHost;
-import ae2.api.networking.security.IActionSource;
-import ae2.api.networking.storage.IStorageService;
-import ae2.api.orientation.BlockOrientation;
-import ae2.api.stacks.AEItemKey;
-import ae2.api.stacks.AEKey;
-import ae2.api.stacks.KeyCounter;
-import ae2.api.storage.MEStorage;
-import ae2.api.storage.StorageHelper;
-import ae2.api.upgrades.IUpgradeInventory;
-import ae2.api.util.AECableType;
-import ae2.helpers.patternprovider.PatternProviderLogic;
-import ae2.helpers.patternprovider.PatternProviderLogicHost;
-import ae2.util.Platform;
-import cofh.core.block.TileReconfigurable;
+import appeng.api.AEApi;
+import appeng.api.config.Actionable;
+import appeng.api.networking.GridFlags;
+import appeng.api.config.Settings;
+import appeng.api.config.YesNo;
+import appeng.api.networking.IGrid;
+import appeng.api.networking.IGridNode;
+import appeng.api.networking.security.IActionHost;
+import appeng.api.networking.storage.IStorageGrid;
+import appeng.api.storage.IMEInventory;
+import appeng.api.storage.channels.IItemStorageChannel;
+import appeng.api.storage.data.IAEItemStack;
+import appeng.api.util.AECableType;
+import appeng.api.util.AEPartLocation;
+import appeng.api.util.DimensionalCoord;
+import appeng.helpers.DualityInterface;
+import appeng.helpers.IInterfaceHost;
+import appeng.me.GridAccessException;
+import appeng.me.helpers.AENetworkProxy;
+import appeng.me.helpers.IGridProxyable;
+import appeng.me.helpers.MachineSource;
+import appeng.util.Platform;
+import appeng.util.item.AEItemStack;
 import cofh.core.block.TilePowered;
 import cofh.core.util.core.SlotConfig;
 import cofh.core.util.helpers.ItemHelper;
 import cofh.thermalexpansion.block.machine.BlockMachine;
 import cofh.thermalexpansion.block.machine.TileMachineBase;
-import com.recursivepineapple.appliedthermal.integration.appflux.AppFluxCompat;
-import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import com.recursivepineapple.appliedthermal.init.ATItems;
-import java.lang.reflect.Field;
+import com.recursivepineapple.appliedthermal.integration.fluxapplied.FluxAppliedCompat;
+import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
+import com.recursivepineapple.appliedthermal.mixin.AccessorTileMachineBase;
+import com.recursivepineapple.appliedthermal.mixin.AccessorTileReconfigurable;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import javax.annotation.Nullable;
+import net.minecraft.inventory.InventoryCrafting;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
-import net.minecraft.util.text.ITextComponent;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import net.minecraftforge.items.ItemStackHandler;
 
-public final class AppliedThermalProviderAttachment implements PatternProviderLogicHost, IActionHost,
-    IInWorldGridNodeHost {
+public final class AppliedThermalProviderAttachment {
 
-    private static final String TAG_ROOT = "AppliedThermalProvider";
+    private static final String TAG_ROOT = "AppliedThermalProviderUEL";
     private static final String TAG_RETURN_OUTPUTS = "ReturnOutputsToNetwork";
-    @Nullable
-    private static Field slotConfigField;
-    private static boolean slotConfigFieldResolved;
+    private static final String TAG_INTERFACE = "Interface";
+    private static final String TAG_FLUX_CARD = "FluxCard";
+    private static final String TAG_PATTERN_IN_FLIGHT = "PatternInFlight";
+    private static final String TAG_LAST_PATTERN_PUSH = "LastPatternPush";
+    private static final long BUSY_RELEASE_DELAY = 2L;
 
     private final TileMachineBase tile;
-    private IManagedGridNode mainNode;
-    private PatternProviderLogic logic;
+    private final ItemStackHandler fluxCard = new ItemStackHandler(1) {
+        @Override
+        public boolean isItemValid(int slot, ItemStack stack) {
+            return stack.getItem() == ATItems.getFluxInductionCard();
+        }
+
+        @Override
+        protected void onContentsChanged(int slot) {
+            saveChanges();
+        }
+
+        @Override
+        public int getSlotLimit(int slot) {
+            return 1;
+        }
+    };
+
+    private AENetworkProxy proxy;
+    private DualityInterface duality;
     private boolean loaded;
     private boolean enabled;
+    private boolean returnOutputsToNetwork = true;
+    private boolean patternInFlight;
+    private long lastPatternPushTick = Long.MIN_VALUE;
     @Nullable
-    private NBTTagCompound savedProviderState;
+    private NBTTagCompound savedState;
     @Nullable
     private String customName;
-    private boolean returnOutputsToNetwork = true;
 
     public AppliedThermalProviderAttachment(TileMachineBase tile) {
         this.tile = tile;
         rebuildAeState();
     }
 
-    private IManagedGridNode createManagedNode() {
-        return GridHelper.createManagedNode(this.tile, TileListener.INSTANCE)
-            .setFlags(GridFlags.REQUIRE_CHANNEL)
-            .setInWorldNode(true)
-            .setExposedOnSides(EnumSet.allOf(EnumFacing.class))
-            .setVisualRepresentation(new ItemStack(ATItems.getPatternProviderAugment()))
-            .setTagName("appliedthermal");
-    }
-
-    private PatternProviderLogic createLogic(IManagedGridNode node) {
-        PatternProviderLogicHost host = tile instanceof PatternProviderLogicHost ? (PatternProviderLogicHost) tile : this;
-        return new ThermalMachinePatternProviderLogic(node, host, ATItems.getPatternProviderAugment(), 36, this);
-    }
-
     private void rebuildAeState() {
-        this.mainNode = createManagedNode();
-        this.logic = createLogic(this.mainNode);
-        applySavedProviderState();
+        ItemStack upgradeIdentity = new ItemStack(ATItems.getPatternProviderAugment());
+        this.proxy = new AENetworkProxy((IGridProxyable) tile, "proxy", upgradeIdentity, true);
+        this.proxy.setFlags(GridFlags.REQUIRE_CHANNEL);
+        this.proxy.setValidSides(EnumSet.allOf(EnumFacing.class));
+        this.duality = new DualityInterface(this.proxy, (IInterfaceHost) tile);
+        this.proxy.setVisualRepresentation(getMachineRepresentation());
+        applySavedState();
+    }
+
+    public TileMachineBase getTile() {
+        return tile;
+    }
+
+    public AENetworkProxy getProxy() {
+        return proxy;
+    }
+
+    public DualityInterface getDuality() {
+        return duality;
+    }
+
+    public ItemStackHandler getFluxCardInventory() {
+        return fluxCard;
+    }
+
+    public boolean isFluxCardInstalled() {
+        ItemStack stack = fluxCard.getStackInSlot(0);
+        return !stack.isEmpty() && stack.getItem() == ATItems.getFluxInductionCard();
     }
 
     public void setEnabled(boolean enabled) {
         if (this.enabled == enabled) {
+            if (enabled && loaded) {
+                ensureReady();
+            }
             return;
         }
         this.enabled = enabled;
         if (enabled) {
-            createNodeIfReady();
-            refreshProviderState();
+            ensureReady();
         } else {
-            captureProviderState();
-            rebuildAfterDestroy();
+            captureState();
+            proxy.invalidate();
         }
         saveChanges();
     }
@@ -109,424 +140,391 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
         return enabled;
     }
 
-    public void ejectContentsOnAugmentRemoval() {
-        if (!this.enabled || tile.getWorld() == null || tile.getWorld().isRemote) {
-            return;
-        }
-
-        List<ItemStack> drops = new ArrayList<>();
-        this.logic.addDrops(drops);
-        for (ItemStack upgrade : this.logic.getUpgrades()) {
-            if (!upgrade.isEmpty()) {
-                drops.add(upgrade.copy());
-            }
-        }
-
-        this.logic.clearContent();
-        captureProviderState();
-        saveChanges();
-        Platform.spawnDrops(tile.getWorld(), tile.getPos(), drops);
-    }
-
     public void onReady() {
         this.loaded = true;
-        createNodeIfReady();
-        if (enabled) {
-            refreshProviderState();
-        }
+        ensureReady();
+    }
+
+    public void onChunkUnload() {
+        captureState();
+        this.loaded = false;
+        proxy.onChunkUnload();
     }
 
     public void invalidate() {
-        captureProviderState();
+        captureState();
         this.loaded = false;
-        rebuildAfterDestroy();
+        proxy.invalidate();
+    }
+
+    private void ensureReady() {
+        if (!enabled || !loaded || tile.getWorld() == null || tile.getWorld().isRemote) {
+            return;
+        }
+        proxy.setVisualRepresentation(getMachineRepresentation());
+        if (proxy.isReady()) {
+            return;
+        }
+        proxy.onReady();
+        duality.initialize();
     }
 
     public void readFromNBT(NBTTagCompound nbt) {
-        if (!nbt.hasKey(TAG_ROOT)) {
+        if (!nbt.hasKey(TAG_ROOT, 10)) {
             return;
         }
-        NBTTagCompound tag = nbt.getCompoundTag(TAG_ROOT);
-        this.savedProviderState = tag.copy();
-        applySavedProviderState();
-        if (tag.hasKey("CustomName")) {
-            this.customName = tag.getString("CustomName");
-        }
-        this.returnOutputsToNetwork = !tag.hasKey(TAG_RETURN_OUTPUTS) || tag.getBoolean(TAG_RETURN_OUTPUTS);
+        this.savedState = nbt.getCompoundTag(TAG_ROOT).copy();
+        applySavedState();
     }
 
     public void writeToNBT(NBTTagCompound nbt) {
-        captureProviderState();
-        if (this.savedProviderState != null) {
-            nbt.setTag(TAG_ROOT, this.savedProviderState.copy());
+        captureState();
+        if (savedState != null) {
+            nbt.setTag(TAG_ROOT, savedState.copy());
         }
     }
 
-    private void createNodeIfReady() {
-        if (enabled && loaded && this.mainNode.getNode() == null && tile.hasWorld() && !tile.getWorld().isRemote) {
-            try {
-                this.mainNode.create(tile.getWorld(), tile.getPos());
-            } catch (IllegalStateException e) {
-                captureProviderState();
-                rebuildAfterDestroy();
-                this.mainNode.create(tile.getWorld(), tile.getPos());
-            }
-        }
-        if (enabled && this.mainNode.getNode() != null) {
-            this.mainNode.setVisualRepresentation(getMainContainerIcon());
-        }
-    }
-
-    private void rebuildAfterDestroy() {
-        this.mainNode.destroy();
-        rebuildAeState();
-    }
-
-    private void captureProviderState() {
+    private void captureState() {
         NBTTagCompound tag = new NBTTagCompound();
-        this.logic.writeToNBT(tag);
-        this.mainNode.saveToNBT(tag);
-        if (this.customName != null && !this.customName.isEmpty()) {
-            tag.setString("CustomName", this.customName);
+        NBTTagCompound interfaceTag = new NBTTagCompound();
+        duality.writeToNBT(interfaceTag);
+        proxy.writeToNBT(interfaceTag);
+        tag.setTag(TAG_INTERFACE, interfaceTag);
+        tag.setTag(TAG_FLUX_CARD, fluxCard.serializeNBT());
+        tag.setBoolean(TAG_RETURN_OUTPUTS, returnOutputsToNetwork);
+        tag.setBoolean(TAG_PATTERN_IN_FLIGHT, patternInFlight);
+        if (lastPatternPushTick != Long.MIN_VALUE) {
+            tag.setLong(TAG_LAST_PATTERN_PUSH, lastPatternPushTick);
         }
-        tag.setBoolean(TAG_RETURN_OUTPUTS, this.returnOutputsToNetwork);
-        this.savedProviderState = tag;
+        if (customName != null && !customName.isEmpty()) {
+            tag.setString("CustomName", customName);
+        }
+        this.savedState = tag;
     }
 
-    private void applySavedProviderState() {
-        if (this.savedProviderState == null) {
+    private void applySavedState() {
+        if (savedState == null) {
             return;
         }
-        NBTTagCompound tag = this.savedProviderState.copy();
-        this.logic.readFromNBT(tag);
-        this.mainNode.loadFromNBT(tag);
-        if (tag.hasKey("CustomName")) {
-            this.customName = tag.getString("CustomName");
+        NBTTagCompound tag = savedState.copy();
+        if (tag.hasKey(TAG_INTERFACE, 10)) {
+            NBTTagCompound interfaceTag = tag.getCompoundTag(TAG_INTERFACE);
+            duality.readFromNBT(interfaceTag);
+            proxy.readFromNBT(interfaceTag);
         }
-        this.returnOutputsToNetwork = !tag.hasKey(TAG_RETURN_OUTPUTS) || tag.getBoolean(TAG_RETURN_OUTPUTS);
-        if (enabled && loaded) {
-            refreshProviderState();
+        if (tag.hasKey(TAG_FLUX_CARD, 10)) {
+            fluxCard.deserializeNBT(tag.getCompoundTag(TAG_FLUX_CARD));
         }
+        returnOutputsToNetwork = !tag.hasKey(TAG_RETURN_OUTPUTS) || tag.getBoolean(TAG_RETURN_OUTPUTS);
+        patternInFlight = tag.getBoolean(TAG_PATTERN_IN_FLIGHT);
+        lastPatternPushTick = tag.hasKey(TAG_LAST_PATTERN_PUSH)
+            ? tag.getLong(TAG_LAST_PATTERN_PUSH)
+            : Long.MIN_VALUE;
+        customName = tag.hasKey("CustomName") ? tag.getString("CustomName") : null;
     }
 
-    @Override
-    public PatternProviderLogic getLogic() {
-        return logic;
-    }
+    public void ejectContentsOnAugmentRemoval() {
+        if (!enabled || tile.getWorld() == null || tile.getWorld().isRemote) {
+            return;
+        }
+        List<ItemStack> drops = new ArrayList<>();
+        duality.addDrops(drops);
+        ItemStack card = fluxCard.getStackInSlot(0);
+        if (!card.isEmpty()) {
+            drops.add(card.copy());
+        }
+        Platform.spawnDrops(tile.getWorld(), tile.getPos(), drops);
 
-    @Override
-    public TileEntity getTileEntity() {
-        return tile;
-    }
-
-    @Override
-    public EnumSet<EnumFacing> getTargets() {
-        return EnumSet.allOf(EnumFacing.class);
-    }
-
-    @Override
-    public boolean hasCustomName() {
-        return customName != null && !customName.isEmpty();
-    }
-
-    @Override
-    @Nullable
-    public String getCustomName() {
-        return customName;
-    }
-
-    @Override
-    public void setCustomName(@Nullable String name) {
-        this.customName = name;
+        proxy.invalidate();
+        savedState = null;
+        customName = null;
+        returnOutputsToNetwork = true;
+        patternInFlight = false;
+        lastPatternPushTick = Long.MIN_VALUE;
+        fluxCard.setStackInSlot(0, ItemStack.EMPTY);
+        rebuildAeState();
         saveChanges();
     }
 
-    @Override
-    public void saveChanges() {
+    public boolean tryPushPattern(InventoryCrafting table) {
+        if (!enabled || !proxy.isActive()) {
+            return false;
+        }
+        if (isBlockingEnabled() && isPatternTargetBusy()) {
+            return false;
+        }
+
+        List<ItemStack> snapshot = snapshotInventory();
+        boolean hasInput = false;
+        for (int i = 0; i < table.getSizeInventory(); i++) {
+            ItemStack input = table.getStackInSlot(i);
+            if (input.isEmpty()) {
+                continue;
+            }
+            hasInput = true;
+            if (!insertIntoSnapshot(snapshot, input.copy())) {
+                return false;
+            }
+        }
+        if (!hasInput) {
+            return false;
+        }
+
+        commitSnapshot(snapshot);
+        if (isBlockingEnabled()) {
+            patternInFlight = true;
+            lastPatternPushTick = tile.getWorld() == null ? 0L : tile.getWorld().getTotalWorldTime();
+        }
+        saveChanges();
+        return true;
+    }
+
+    private List<ItemStack> snapshotInventory() {
+        List<ItemStack> snapshot = new ArrayList<>(tile.getSizeInventory());
+        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
+            snapshot.add(tile.getStackInSlot(slot).copy());
+        }
+        return snapshot;
+    }
+
+    private boolean insertIntoSnapshot(List<ItemStack> snapshot, ItemStack input) {
+        for (int slot = 0; slot < snapshot.size() && !input.isEmpty(); slot++) {
+            if (!isInputSlot(slot) || !tile.isItemValidForSlot(slot, input)) {
+                continue;
+            }
+            ItemStack existing = snapshot.get(slot);
+            int limit = Math.min(tile.getInventoryStackLimit(), input.getMaxStackSize());
+            if (existing.isEmpty()) {
+                int moved = Math.min(limit, input.getCount());
+                ItemStack placed = input.copy();
+                placed.setCount(moved);
+                snapshot.set(slot, placed);
+                input.shrink(moved);
+            } else if (ItemHelper.itemsIdentical(existing, input)) {
+                int slotLimit = Math.min(limit, existing.getMaxStackSize());
+                int moved = Math.min(slotLimit - existing.getCount(), input.getCount());
+                if (moved > 0) {
+                    existing.grow(moved);
+                    input.shrink(moved);
+                }
+            }
+        }
+        return input.isEmpty();
+    }
+
+    private void commitSnapshot(List<ItemStack> snapshot) {
+        for (int slot = 0; slot < snapshot.size(); slot++) {
+            if (!isInputSlot(slot)) {
+                continue;
+            }
+            ItemStack before = tile.getStackInSlot(slot);
+            ItemStack after = snapshot.get(slot);
+            if (!ItemStack.areItemStacksEqual(before, after)) {
+                tile.setInventorySlotContents(slot, after);
+            }
+        }
         tile.markDirty();
     }
 
-    @Override
-    public AEItemKey getTerminalIcon() {
-        ItemStack stack = tile.getBlockType() instanceof BlockMachine
-            ? new ItemStack(tile.getBlockType(), 1, tile.getBlockMetadata())
-            : new ItemStack(ATItems.getPatternProviderAugment());
-        return AEItemKey.of(stack);
-    }
-
-    @Override
-    public ItemStack getMainContainerIcon() {
-        if (tile.getBlockType() instanceof BlockMachine) {
-            return new ItemStack(tile.getBlockType(), 1, tile.getBlockMetadata());
+    public boolean isPatternTargetBusy() {
+        if (!isBlockingEnabled()) {
+            return false;
         }
-        return new ItemStack(ATItems.getPatternProviderAugment());
-    }
-
-    @Override
-    public PatternContainerGroup getTerminalGroup() {
-        AEItemKey icon = getTerminalIcon();
-        ITextComponent name = tile.getDisplayName();
-        return new PatternContainerGroup(icon, name, java.util.Collections.emptyList());
-    }
-
-    @Override
-    public IUpgradeInventory getUpgrades() {
-        return this.logic.getUpgrades();
-    }
-
-    @Override
-    @Nullable
-    public IGrid getGrid() {
-        return logic.getGrid();
-    }
-
-    @Override
-    @Nullable
-    public IGridNode getActionableNode() {
-        return mainNode.getNode();
-    }
-
-    public IManagedGridNode getMainNode() {
-        return mainNode;
-    }
-
-    @Override
-    @Nullable
-    public IGridNode getGridNode(EnumFacing dir) {
-        return enabled ? mainNode.getNode() : null;
-    }
-
-    @Override
-    public AECableType getCableConnectionType(EnumFacing dir) {
-        return enabled ? AECableType.SMART : AECableType.NONE;
-    }
-
-    public long insertInput(AEKey what, long amount, Actionable action) {
-        if (!(what instanceof AEItemKey) || amount <= 0 || amount > Integer.MAX_VALUE) {
-            return 0;
+        if (patternInFlight) {
+            return true;
         }
-        AEItemKey itemKey = (AEItemKey) what;
-        ItemStack stack = itemKey.toStack((int) amount);
-        ItemStack simulated = stack.copy();
-        int inserted = 0;
-        for (int slot = 0; slot < tile.getSizeInventory() && inserted < amount; slot++) {
-            if (!isInputSlot(slot) || !tile.isItemValidForSlot(slot, simulated)) {
-                continue;
-            }
-            ItemStack existing = tile.getStackInSlot(slot);
-            if (existing.isEmpty()) {
-                int move = Math.min(simulated.getCount(), simulated.getMaxStackSize());
-                if (action == Actionable.MODULATE) {
-                    ItemStack copy = simulated.copy();
-                    copy.setCount(move);
-                    tile.setInventorySlotContents(slot, copy);
-                }
-                inserted += move;
-                simulated.shrink(move);
-            } else if (ItemHelper.itemsIdentical(existing, simulated)
-                && existing.getCount() < Math.min(existing.getMaxStackSize(), tile.getInventoryStackLimit())) {
-                int move = Math.min(simulated.getCount(),
-                    Math.min(existing.getMaxStackSize(), tile.getInventoryStackLimit()) - existing.getCount());
-                if (action == Actionable.MODULATE) {
-                    existing.grow(move);
-                    tile.setInventorySlotContents(slot, existing);
-                }
-                inserted += move;
-                simulated.shrink(move);
+        return hasMachineContentsOrProcess();
+    }
+
+    private boolean hasMachineContentsOrProcess() {
+        if (((AccessorTileMachineBase) tile).appliedthermal$getProcessRem() > 0) {
+            return true;
+        }
+        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
+            if ((isInputSlot(slot) || isOutputSlot(slot)) && !tile.getStackInSlot(slot).isEmpty()) {
+                return true;
             }
         }
-        if (inserted > 0 && action == Actionable.MODULATE) {
+        return false;
+    }
+
+    private void refreshInFlightState() {
+        if (!patternInFlight || tile.getWorld() == null) {
+            return;
+        }
+        if (lastPatternPushTick == Long.MIN_VALUE) {
+            lastPatternPushTick = tile.getWorld().getTotalWorldTime() - BUSY_RELEASE_DELAY;
+        }
+        long age = tile.getWorld().getTotalWorldTime() - lastPatternPushTick;
+        if (age >= BUSY_RELEASE_DELAY && !hasMachineContentsOrProcess()) {
+            patternInFlight = false;
+            saveChanges();
+        }
+    }
+
+    public void tickServer() {
+        if (!enabled || tile.getWorld() == null || tile.getWorld().isRemote) {
+            return;
+        }
+        tryReturnOutputsToNetwork();
+        tryChargeMachineFromFluxNetwork();
+        refreshInFlightState();
+    }
+
+    public void tryReturnOutputsToNetwork() {
+        if (!returnOutputsToNetwork || !proxy.isActive()) {
+            return;
+        }
+        try {
+            IStorageGrid storage = proxy.getStorage();
+            IItemStorageChannel channel =
+                AEApi.instance().storage().getStorageChannel(IItemStorageChannel.class);
+            IMEInventory<IAEItemStack> inventory = storage.getInventory(channel);
+            MachineSource source = new MachineSource((IActionHost) tile);
+
+            for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
+                if (!isOutputSlot(slot)) {
+                    continue;
+                }
+                ItemStack stack = tile.getStackInSlot(slot);
+                if (stack.isEmpty()) {
+                    continue;
+                }
+                IAEItemStack simulatedInput = AEItemStack.fromItemStack(stack);
+                IAEItemStack simulatedRemainder =
+                    Platform.poweredInsert(proxy.getEnergy(), inventory, simulatedInput, source, Actionable.SIMULATE);
+                long accepted = stack.getCount() - stackSize(simulatedRemainder);
+                if (accepted <= 0) {
+                    continue;
+                }
+
+                ItemStack offered = stack.copy();
+                offered.setCount((int) Math.min(accepted, Integer.MAX_VALUE));
+                IAEItemStack actualRemainder = Platform.poweredInsert(
+                    proxy.getEnergy(), inventory, AEItemStack.fromItemStack(offered), source, Actionable.MODULATE);
+                int inserted = offered.getCount() - (int) stackSize(actualRemainder);
+                if (inserted <= 0) {
+                    continue;
+                }
+
+                ItemStack remaining = stack.copy();
+                remaining.shrink(inserted);
+                tile.setInventorySlotContents(slot, remaining.isEmpty() ? ItemStack.EMPTY : remaining);
+                ItemStack returned = stack.copy();
+                returned.setCount(inserted);
+                duality.onStackReturnedToNetwork(AEItemStack.fromItemStack(returned));
+                tile.markDirty();
+            }
+        } catch (GridAccessException ignored) {
+        }
+    }
+
+    private static long stackSize(@Nullable IAEItemStack stack) {
+        return stack == null ? 0L : stack.getStackSize();
+    }
+
+    private void tryChargeMachineFromFluxNetwork() {
+        if (!isFluxCardInstalled() || !FluxAppliedCompat.bridge().isAvailable() || !(tile instanceof TilePowered)) {
+            return;
+        }
+        TilePowered powered = (TilePowered) tile;
+        int requested = powered.getMaxEnergyStored(null) - powered.getEnergyStored(null);
+        if (requested <= 0) {
+            return;
+        }
+        int accepted = powered.receiveEnergy(null, requested, true);
+        if (accepted <= 0) {
+            return;
+        }
+        long extracted = FluxAppliedCompat.bridge().extractEnergy(this, accepted, false);
+        if (extracted <= 0) {
+            return;
+        }
+        int received = powered.receiveEnergy(null, (int) Math.min(extracted, Integer.MAX_VALUE), false);
+        if (received < extracted) {
+            FluxAppliedCompat.bridge().insertEnergy(this, extracted - received, false);
+        }
+        if (received > 0) {
             tile.markDirty();
         }
-        return inserted;
     }
 
     public boolean shouldReturnOutputsToNetwork() {
         return returnOutputsToNetwork;
     }
 
-    public void setReturnOutputsToNetwork(boolean returnOutputsToNetwork) {
-        if (this.returnOutputsToNetwork == returnOutputsToNetwork) {
-            return;
-        }
-        this.returnOutputsToNetwork = returnOutputsToNetwork;
-        saveChanges();
-    }
-
-    public void tryReturnOutputsToNetwork() {
-        if (!enabled || !returnOutputsToNetwork || tile.getWorld() == null || tile.getWorld().isRemote) {
-            return;
-        }
-        IGrid grid = getGrid();
-        IGridNode node = getActionableNode();
-        if (grid == null || node == null || !node.isActive()) {
-            return;
-        }
-        IStorageService storageService = grid.getStorageService();
-        if (storageService == null) {
-            return;
-        }
-        MEStorage storage = storageService.getInventory();
-        IActionSource source = IActionSource.ofMachine(this);
-        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
-            if (!isOutputSlot(slot)) {
-                continue;
-            }
-            ItemStack stack = tile.getStackInSlot(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-            AEItemKey key = AEItemKey.of(stack);
-            long requested = stack.getCount();
-            long accepted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, requested, source,
-                Actionable.SIMULATE);
-            if (accepted <= 0) {
-                continue;
-            }
-            long inserted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, accepted, source,
-                Actionable.MODULATE);
-            if (inserted <= 0) {
-                continue;
-            }
-            ItemStack remaining = stack.copy();
-            remaining.shrink((int) Math.min(inserted, Integer.MAX_VALUE));
-            tile.setInventorySlotContents(slot, remaining.isEmpty() ? ItemStack.EMPTY : remaining);
-            tile.markDirty();
+    public void setReturnOutputsToNetwork(boolean enabled) {
+        if (returnOutputsToNetwork != enabled) {
+            returnOutputsToNetwork = enabled;
+            saveChanges();
         }
     }
 
-    public void tryChargeMachineFromFluxNetwork() {
-        if (!enabled || tile.getWorld() == null || tile.getWorld().isRemote || !(tile instanceof TilePowered)
-            || !(tile instanceof AppliedThermalMachine)) {
-            return;
-        }
-        AppliedThermalMachine machine = (AppliedThermalMachine) tile;
-        if (!machine.appliedthermal$getFluxAttachment().isInductionCardInstalled()) {
-            return;
-        }
-        TilePowered powered = (TilePowered) tile;
-        int energySpace = powered.getMaxEnergyStored(null) - powered.getEnergyStored(null);
-        if (energySpace <= 0) {
-            return;
-        }
-        long extracted = AppFluxCompat.bridge().extractEnergyFromGrid(machine, energySpace, false);
-        if (extracted <= 0) {
-            return;
-        }
-        powered.receiveEnergy(null, clampToInt(extracted), false);
+    public boolean isBlockingEnabled() {
+        return duality.getConfigManager().getSetting(Settings.BLOCK) == YesNo.YES;
+    }
+
+    public void saveChanges() {
         tile.markDirty();
     }
 
-    private boolean isOutputSlot(int slot) {
-        SlotConfig slotConfig = getSlotConfig(tile);
-        return slotConfig != null
-            && slotConfig.allowExtractionSlot != null
-            && slot >= 0
-            && slot < slotConfig.allowExtractionSlot.length
-            && slotConfig.allowExtractionSlot[slot];
-    }
-
-    private boolean isInputSlot(int slot) {
-        SlotConfig slotConfig = getSlotConfig(tile);
-        return slotConfig != null
-            && slotConfig.allowInsertionSlot != null
-            && slot >= 0
-            && slot < slotConfig.allowInsertionSlot.length
-            && slotConfig.allowInsertionSlot[slot];
+    public IGridNode getActionableNode() {
+        return proxy.getNode();
     }
 
     @Nullable
-    private static SlotConfig getSlotConfig(TileMachineBase tile) {
+    public IGrid getGrid() {
         try {
-            Field field = getSlotConfigField();
-            return field == null ? null : (SlotConfig) field.get(tile);
-        } catch (IllegalAccessException ignored) {
+            return proxy.getGrid();
+        } catch (GridAccessException ignored) {
             return null;
         }
     }
 
-    @Nullable
-    private static Field getSlotConfigField() {
-        if (!slotConfigFieldResolved) {
-            slotConfigFieldResolved = true;
-            try {
-                slotConfigField = TileReconfigurable.class.getDeclaredField("slotConfig");
-                slotConfigField.setAccessible(true);
-            } catch (NoSuchFieldException ignored) {
-                slotConfigField = null;
-            }
-        }
-        return slotConfigField;
+    public IGridNode getGridNode(AEPartLocation side) {
+        return enabled ? proxy.getNode() : null;
     }
 
-    public boolean canAcceptInputs(KeyCounter[] inputs) {
-        for (KeyCounter counter : inputs) {
-            for (Object2LongMap.Entry<AEKey> input : counter) {
-                if (insertInput(input.getKey(), input.getLongValue(), Actionable.SIMULATE) < input.getLongValue()) {
-                    return false;
-                }
-            }
-        }
-        return true;
+    public AECableType getCableConnectionType(AEPartLocation side) {
+        return enabled ? AECableType.SMART : AECableType.NONE;
     }
 
-    public boolean acceptsAny(KeyCounter[] inputs) {
-        for (KeyCounter counter : inputs) {
-            for (Object2LongMap.Entry<AEKey> ignored : counter) {
-                if (ignored.getLongValue() > 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    public DimensionalCoord getLocation() {
+        return new DimensionalCoord(tile);
     }
 
-    public boolean containsAnyInput() {
-        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
-            if (isInputSlot(slot) && !tile.getStackInSlot(slot).isEmpty()) {
-                return true;
-            }
+    public ItemStack getMachineRepresentation() {
+        if (tile.getBlockType() instanceof BlockMachine) {
+            return new ItemStack(tile.getBlockType(), 1, tile.getBlockMetadata());
         }
-        return false;
+        return new ItemStack(ATItems.getPatternProviderAugment());
     }
 
-    public boolean containsInput(AEKey key) {
-        if (!(key instanceof AEItemKey)) {
-            return false;
+    public String getCustomInventoryName() {
+        if (customName != null && !customName.isEmpty()) {
+            return customName;
         }
-        AEItemKey itemKey = (AEItemKey) key;
-        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
-            if (isInputSlot(slot) && itemKey.matches(tile.getStackInSlot(slot))) {
-                return true;
-            }
-        }
-        return false;
+        return tile.getDisplayName().getUnformattedText();
     }
 
-    private static int clampToInt(long value) {
-        return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(0, (int) value);
+    public boolean hasCustomInventoryName() {
+        return customName != null && !customName.isEmpty();
     }
 
-    private void refreshProviderState() {
-        this.logic.updatePatterns();
-        ICraftingProvider.requestUpdate(this.mainNode);
+    public void setCustomName(@Nullable String name) {
+        customName = name == null || name.isEmpty() ? null : name;
+        saveChanges();
     }
 
-    private static AppliedThermalProviderAttachment getAttachment(TileMachineBase tile) {
-        return ((AppliedThermalMachine) tile).appliedthermal$getProviderAttachment();
+    private boolean isInputSlot(int slot) {
+        SlotConfig config = ((AccessorTileReconfigurable) tile).appliedthermal$getSlotConfig();
+        return config != null && config.allowInsertionSlot != null && slot >= 0
+            && slot < config.allowInsertionSlot.length && config.allowInsertionSlot[slot];
     }
 
-    private enum TileListener implements IGridNodeListener<TileMachineBase> {
-        INSTANCE;
-
-        @Override
-        public void onSaveChanges(TileMachineBase nodeOwner, IGridNode node) {
-            getAttachment(nodeOwner).saveChanges();
-        }
-
-        @Override
-        public void onStateChanged(TileMachineBase nodeOwner, IGridNode node, State reason) {
-            getAttachment(nodeOwner).logic.onMainNodeStateChanged();
-        }
+    private boolean isOutputSlot(int slot) {
+        SlotConfig config = ((AccessorTileReconfigurable) tile).appliedthermal$getSlotConfig();
+        return config != null && config.allowExtractionSlot != null && slot >= 0
+            && slot < config.allowExtractionSlot.length && config.allowExtractionSlot[slot];
     }
 }

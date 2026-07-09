@@ -17,7 +17,6 @@ public abstract class MixinTileCore {
         if (self instanceof TileMachineBase && self instanceof AppliedThermalMachine) {
             AppliedThermalMachine machine = (AppliedThermalMachine) self;
             machine.appliedthermal$getProviderAttachment().onReady();
-            machine.appliedthermal$getFluxAttachment().onReady();
             machine.appliedthermal$getProviderAttachment().setEnabled(machine.appliedthermal$hasPatternProviderAugment());
         }
     }
@@ -27,18 +26,8 @@ public abstract class MixinTileCore {
         Object self = this;
         if (self instanceof TileMachineBase && self instanceof AppliedThermalMachine) {
             AppliedThermalMachine machine = (AppliedThermalMachine) self;
-            machine.appliedthermal$getProviderAttachment().invalidate();
-            machine.appliedthermal$getFluxAttachment().invalidate();
+            machine.appliedthermal$getProviderAttachment().onChunkUnload();
         }
     }
 
-    @Inject(method = "invalidate", at = @At("HEAD"), require = 0)
-    private void appliedthermal$invalidate(CallbackInfo ci) {
-        Object self = this;
-        if (self instanceof TileMachineBase && self instanceof AppliedThermalMachine) {
-            AppliedThermalMachine machine = (AppliedThermalMachine) self;
-            machine.appliedthermal$getProviderAttachment().invalidate();
-            machine.appliedthermal$getFluxAttachment().invalidate();
-        }
-    }
 }

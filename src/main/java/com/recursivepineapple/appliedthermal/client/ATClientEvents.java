@@ -23,5 +23,9 @@ public final class ATClientEvents {
             ATItems.getPatternProviderAugment(),
             0,
             new ModelResourceLocation(ATItems.getPatternProviderAugment().getRegistryName(), "inventory"));
+        ModelLoader.setCustomModelResourceLocation(
+            ATItems.getFluxInductionCard(),
+            0,
+            new ModelResourceLocation(ATItems.getFluxInductionCard().getRegistryName(), "inventory"));
     }
 }

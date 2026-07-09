@@ -29,7 +29,7 @@ public abstract class MixinContainerTileAugmentable extends Container {
     @Unique
     private boolean appliedthermal$sentSettings;
 
-    @Inject(method = "func_75142_b", at = @At("RETURN"))
+    @Inject(method = {"detectAndSendChanges", "func_75142_b"}, at = @At("RETURN"))
     private void appliedthermal$syncProviderSettings(CallbackInfo ci) {
         if (!(baseTile instanceof TileMachineBase) || !(baseTile instanceof AppliedThermalMachine)) {
             return;

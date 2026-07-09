@@ -17,7 +17,7 @@ public abstract class MixinGuiPoweredBase {
     @Shadow
     protected cofh.core.block.TilePowered baseTile;
 
-    @Inject(method = "func_73866_w_", at = @At("RETURN"))
+    @Inject(method = {"initGui", "func_73866_w_"}, at = @At("RETURN"))
     private void appliedthermal$addProviderTab(CallbackInfo ci) {
         if (baseTile instanceof TileMachineBase && baseTile instanceof AppliedThermalMachine) {
             AppliedThermalMachine machine = (AppliedThermalMachine) baseTile;

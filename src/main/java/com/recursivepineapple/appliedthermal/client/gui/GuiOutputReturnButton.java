@@ -1,0 +1,74 @@
+package com.recursivepineapple.appliedthermal.client.gui;
+
+import appeng.client.gui.widgets.ITooltip;
+import com.recursivepineapple.appliedthermal.AppliedThermal;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.util.ResourceLocation;
+import net.minecraft.util.text.translation.I18n;
+
+public final class GuiOutputReturnButton extends GuiButton implements ITooltip {
+
+    private static final ResourceLocation TEXTURE =
+        new ResourceLocation(AppliedThermal.MOD_ID, "textures/gui/output_return.png");
+
+    private boolean active;
+
+    public GuiOutputReturnButton(int x, int y) {
+        super(0, x, y, 16, 16, "");
+    }
+
+    public void setState(boolean active) {
+        this.active = active;
+    }
+
+    public boolean getState() {
+        return active;
+    }
+
+    @Override
+    public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
+        if (!visible) {
+            return;
+        }
+        hovered = mouseX >= x && mouseY >= y && mouseX < x + width && mouseY < y + height;
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        minecraft.getTextureManager().bindTexture(TEXTURE);
+        drawTexturedModalRect(x, y, active ? 0 : 16, 0, 16, 16);
+        mouseDragged(minecraft, mouseX, mouseY);
+    }
+
+    @Override
+    public String getMessage() {
+        return I18n.translateToLocal("gui.appliedthermal.return_outputs")
+            + '\n' + I18n.translateToLocal(active
+            ? "gui.appliedthermal.return_outputs.enabled"
+            : "gui.appliedthermal.return_outputs.disabled");
+    }
+
+    @Override
+    public int xPos() {
+        return x;
+    }
+
+    @Override
+    public int yPos() {
+        return y;
+    }
+
+    @Override
+    public int getWidth() {
+        return width;
+    }
+
+    @Override
+    public int getHeight() {
+        return height;
+    }
+
+    @Override
+    public boolean isVisible() {
+        return visible;
+    }
+}

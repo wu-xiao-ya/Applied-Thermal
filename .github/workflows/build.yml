@@ -14,10 +14,22 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-      - name: Build
-        run: .\gradlew.bat --no-daemon build --stacktrace
+      - name: Build with Gradle
+        run: .\gradlew.bat --no-daemon build -PwithFluxApplied=true --stacktrace
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem build\libs\*.jar |
+            Where-Object Name -NotLike '*-dev.jar' |
+            ForEach-Object {
+              $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+              Set-Content -Path "$($_.FullName).sha256" -Value "$hash  $($_.Name)"
+            }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: appliedthermal-jars
-          path: build/libs/*.jar
+          path: |
+            build/libs/AppliedThermal-AE2UEL-*.jar
+            !build/libs/*-dev.jar
+            build/libs/*.sha256

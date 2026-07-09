@@ -5,9 +5,10 @@
   "compatibilityLevel": "JAVA_8",
   "plugin": "com.recursivepineapple.appliedthermal.core.AppliedThermalMixinPlugin",
   "mixins": [
+    "AccessorTileMachineBase",
+    "AccessorTileReconfigurable",
     "MixinTileMachineBase",
     "MixinTileCore",
-    "MixinTilePowered",
     "MixinBlockMachine",
     "MixinContainerTileAugmentable"
   ],

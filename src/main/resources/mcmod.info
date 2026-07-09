@@ -12,11 +12,12 @@
     "logoFile": "",
     "screenshots": [],
     "dependencies": [
-      "required-after:ae2",
+      "required-after:appliedenergistics2",
       "required-after:thermalexpansion",
       "required-after:cofhcore",
       "required-after:thermalfoundation",
-      "after:appflux"
+      "required-after:mixinbooter@[10.7,)",
+      "after:flux_applied"
     ]
   }
 ]
