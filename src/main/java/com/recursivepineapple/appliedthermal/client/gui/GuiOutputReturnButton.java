@@ -2,15 +2,19 @@ package com.recursivepineapple.appliedthermal.client.gui;
 
 import appeng.client.gui.widgets.ITooltip;
 import com.recursivepineapple.appliedthermal.AppliedThermal;
+import net.minecraft.init.Blocks;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.renderer.RenderHelper;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.translation.I18n;
 
 public final class GuiOutputReturnButton extends GuiButton implements ITooltip {
 
-    private static final ResourceLocation TEXTURE =
+    private static final ItemStack PISTON = new ItemStack(Blocks.PISTON);
+    private static final ResourceLocation DISABLED_OVERLAY =
         new ResourceLocation(AppliedThermal.MOD_ID, "textures/gui/output_return.png");
 
     private boolean active;
@@ -33,9 +37,18 @@ public final class GuiOutputReturnButton extends GuiButton implements ITooltip {
             return;
         }
         hovered = mouseX >= x && mouseY >= y && mouseX < x + width && mouseY < y + height;
+        GlStateManager.pushMatrix();
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-        minecraft.getTextureManager().bindTexture(TEXTURE);
-        drawTexturedModalRect(x, y, active ? 0 : 16, 0, 16, 16);
+        RenderHelper.enableGUIStandardItemLighting();
+        minecraft.getRenderItem().renderItemAndEffectIntoGUI(PISTON, x, y);
+        RenderHelper.disableStandardItemLighting();
+        GlStateManager.disableLighting();
+        GlStateManager.popMatrix();
+        if (!active) {
+            minecraft.getTextureManager().bindTexture(DISABLED_OVERLAY);
+            GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+            drawTexturedModalRect(x, y, 0, 0, 16, 16);
+        }
         mouseDragged(minecraft, mouseX, mouseY);
     }
 
