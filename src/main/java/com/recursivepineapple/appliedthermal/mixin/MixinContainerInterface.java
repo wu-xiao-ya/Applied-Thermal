@@ -34,7 +34,7 @@ public abstract class MixinContainerInterface extends Container implements Appli
         if (host instanceof AppliedThermalMachine) {
             appliedthermal$machine = (AppliedThermalMachine) host;
             addSlotToContainer(new SlotFluxInductionCard(
-                appliedthermal$machine.appliedthermal$getProviderAttachment().getFluxCardInventory(), 0, 187, 80));
+                appliedthermal$machine.appliedthermal$getProviderAttachment().getFluxCardInventory(), 0, 187, 108));
         }
     }
 
