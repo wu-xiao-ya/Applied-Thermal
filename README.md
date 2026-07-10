@@ -19,7 +19,9 @@ Future branches should follow `<minecraft-version>-<ae-implementation>` and appe
 
 Install the Pattern Provider Augment into a Thermal Expansion machine. The machine exposes an AE2S grid node on adjacent sides and appears as a pattern provider when connected to an AE2S cable.
 
-The Thermal machine GUI shows a small AE tab on the right. Click it to open the AE2S pattern-provider window for that Thermal machine. Processing patterns can be placed there; crafting patterns are rejected because Thermal machines are processing targets. The window uses AE2S' native capacity-card support, so the machine starts with 9 active pattern slots and gains 9 more active slots per installed pattern expansion card. Items in Thermal output slots are inserted back into the connected AE2S network by default.
+The Thermal machine GUI shows a small AE tab on the right. Click it to open the AE2S pattern-provider window for that Thermal machine. Processing patterns can be placed there; crafting patterns are rejected because Thermal machines are processing targets. The window uses AE2S' native capacity-card support, so the machine starts with 9 active pattern slots and gains 9 more active slots per installed pattern expansion card.
+
+Items in Thermal output slots are inserted back into the connected AE2S network by default. The piston button at the bottom of the pattern-provider window's left toolbar controls this behavior. A plain piston means output return is enabled; a piston with a red X means it is disabled.
 
 Removing the Pattern Provider Augment ejects every stored pattern, provider upgrade card, pending input, and return-buffer item at the machine before its AE node is disabled.
 

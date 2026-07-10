@@ -32,6 +32,10 @@ public final class AppliedThermalMixinPlugin implements IMixinConfigPlugin {
         if ("ae2.core.gui.AEGuiHandler".equals(targetClassName)) {
             return true;
         }
+        if ("ae2.container.implementations.ContainerPatternProvider".equals(targetClassName)
+            || "ae2.client.gui.implementations.GuiPatternProvider".equals(targetClassName)) {
+            return true;
+        }
         return "cofh.thermalexpansion.block.machine.TileMachineBase".equals(targetClassName)
             || "cofh.core.block.TileCore".equals(targetClassName)
             || "cofh.core.block.TilePowered".equals(targetClassName)
