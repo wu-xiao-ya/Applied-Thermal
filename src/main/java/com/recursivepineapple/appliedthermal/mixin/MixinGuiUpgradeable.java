@@ -34,6 +34,6 @@ public abstract class MixinGuiUpgradeable extends GuiContainer {
             return;
         }
         Minecraft.getMinecraft().getTextureManager().bindTexture(APPLIEDTHERMAL$EXTENSION);
-        drawTexturedModalRect(offsetX + 177, offsetY + 100, 0, 0, 35, 34);
+        drawTexturedModalRect(offsetX + 181, offsetY + 96, 0, 0, 35, 34);
     }
 }
