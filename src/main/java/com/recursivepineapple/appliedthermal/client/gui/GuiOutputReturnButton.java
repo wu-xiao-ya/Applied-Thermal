@@ -20,7 +20,7 @@ public final class GuiOutputReturnButton extends GuiButton implements ITooltip {
     private boolean active;
 
     public GuiOutputReturnButton(int x, int y) {
-        super(0, x, y, 16, 16, "");
+        super(0, x, y, 18, 18, "");
     }
 
     public void setState(boolean active) {
@@ -37,17 +37,20 @@ public final class GuiOutputReturnButton extends GuiButton implements ITooltip {
             return;
         }
         hovered = mouseX >= x && mouseY >= y && mouseX < x + width && mouseY < y + height;
+        minecraft.getTextureManager().bindTexture(DISABLED_OVERLAY);
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+        drawTexturedModalRect(x, y, 0, 0, 18, 18);
         GlStateManager.pushMatrix();
         GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
         RenderHelper.enableGUIStandardItemLighting();
-        minecraft.getRenderItem().renderItemAndEffectIntoGUI(PISTON, x, y);
+        minecraft.getRenderItem().renderItemAndEffectIntoGUI(PISTON, x + 1, y + 1);
         RenderHelper.disableStandardItemLighting();
         GlStateManager.disableLighting();
         GlStateManager.popMatrix();
         if (!active) {
             minecraft.getTextureManager().bindTexture(DISABLED_OVERLAY);
             GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
-            drawTexturedModalRect(x, y, 0, 0, 16, 16);
+            drawTexturedModalRect(x + 1, y + 1, 18, 0, 16, 16);
         }
         mouseDragged(minecraft, mouseX, mouseY);
     }
