@@ -6,35 +6,26 @@ import com.recursivepineapple.appliedthermal.container.AppliedThermalInterfaceCo
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import com.recursivepineapple.appliedthermal.network.ATNetwork;
 import com.recursivepineapple.appliedthermal.network.MessageToggleOutputReturn;
-import java.util.List;
 import javax.annotation.Nullable;
 import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.inventory.Container;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = GuiInterface.class, remap = false)
-public abstract class MixinGuiInterface {
-
-    @Shadow
-    protected int guiLeft;
-
-    @Shadow
-    protected int guiTop;
-
-    @Shadow
-    protected List<GuiButton> buttonList;
-
-    @Shadow
-    public Container inventorySlots;
+public abstract class MixinGuiInterface extends GuiContainer {
 
     @Unique
     @Nullable
     private GuiOutputReturnButton appliedthermal$outputReturn;
+
+    protected MixinGuiInterface(Container inventorySlotsIn) {
+        super(inventorySlotsIn);
+    }
 
     @Inject(method = "addButtons", at = @At("RETURN"))
     private void appliedthermal$addOutputReturnButton(CallbackInfo ci) {
@@ -53,7 +44,7 @@ public abstract class MixinGuiInterface {
         }
     }
 
-    @Inject(method = "actionPerformed", at = @At("HEAD"), cancellable = true)
+    @Inject(method = {"actionPerformed", "func_146284_a"}, at = @At("HEAD"), cancellable = true)
     private void appliedthermal$toggleOutputReturn(GuiButton button, CallbackInfo ci) {
         AppliedThermalMachine machine = appliedthermal$getMachine();
         if (machine == null || button != appliedthermal$outputReturn || appliedthermal$outputReturn == null) {

@@ -38,7 +38,7 @@ public abstract class MixinContainerInterface extends Container implements Appli
         }
     }
 
-    @Inject(method = "detectAndSendChanges", at = @At("RETURN"))
+    @Inject(method = {"detectAndSendChanges", "func_75142_b"}, at = @At("RETURN"))
     private void appliedthermal$syncSettings(CallbackInfo ci) {
         if (appliedthermal$machine == null) {
             return;

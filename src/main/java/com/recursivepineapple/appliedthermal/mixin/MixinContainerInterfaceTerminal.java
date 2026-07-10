@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class MixinContainerInterfaceTerminal {
 
     @Redirect(
-        method = {"detectAndSendChanges", "regenList"},
+        method = {"detectAndSendChanges", "func_75142_b", "regenList"},
         at = @At(
             value = "INVOKE",
             target = "Lappeng/api/networking/IGrid;getMachines(Ljava/lang/Class;)"
