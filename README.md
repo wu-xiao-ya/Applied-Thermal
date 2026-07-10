@@ -37,10 +37,13 @@ when using standard Forge.
 | Dependency | Version | Role |
 | --- | --- | --- |
 | Flux_Applied | 1.0.0 | Enables FE charging from the AE network through the Flux Induction Card. |
+| IndustrialCraft 2 | 2.8.222-ex112 | Required by Flux_Applied's energy port implementation. |
 
 Flux_Applied integration is loaded only when the `flux_applied` mod is present. Its
 own required dependency, Terminal Interaction Integration 1.0, must also be installed.
-Applied Thermal's pattern and interface features work without either optional mod.
+The current Flux_Applied energy port class directly implements IC2 energy interfaces,
+so IC2 must also be installed when Flux_Applied is present. Applied Thermal's pattern
+and interface features work without these optional energy-integration mods.
 
 ## Usage
 
