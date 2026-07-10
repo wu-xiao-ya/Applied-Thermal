@@ -1,13 +1,16 @@
 package com.recursivepineapple.appliedthermal.mixin;
 
 import appeng.api.config.LockCraftingMode;
+import appeng.api.implementations.ICraftingPatternItem;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.helpers.DualityInterface;
 import appeng.helpers.IInterfaceHost;
 import appeng.me.helpers.AENetworkProxy;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
-import java.util.Set;
 import net.minecraft.inventory.InventoryCrafting;
+import net.minecraft.item.ItemStack;
+import net.minecraft.world.World;
+import net.minecraftforge.items.IItemHandler;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -27,9 +30,6 @@ public abstract class MixinDualityInterface {
     private AENetworkProxy gridProxy;
 
     @Shadow
-    private Set<ICraftingPatternDetails> craftingList;
-
-    @Shadow
     private boolean hasItemsToSend() {
         throw new AssertionError();
     }
@@ -47,6 +47,9 @@ public abstract class MixinDualityInterface {
     @Shadow
     public abstract LockCraftingMode getCraftingLockedReason();
 
+    @Shadow
+    public abstract IItemHandler getPatterns();
+
     @Inject(method = "pushPattern", at = @At("HEAD"), cancellable = true)
     private void appliedthermal$pushIntoMachine(ICraftingPatternDetails pattern, InventoryCrafting table,
                                                 CallbackInfoReturnable<Boolean> cir) {
@@ -55,7 +58,7 @@ public abstract class MixinDualityInterface {
         }
         AppliedThermalMachine machine = (AppliedThermalMachine) iHost;
         if (pattern.isCraftable() || hasItemsToSend() || hasItemsToSendFacing() || !gridProxy.isActive()
-            || craftingList == null || !craftingList.contains(pattern)
+            || !appliedthermal$isInstalledPattern(pattern)
             || getCraftingLockedReason() != LockCraftingMode.NONE) {
             cir.setReturnValue(false);
             return;
@@ -75,5 +78,26 @@ public abstract class MixinDualityInterface {
             cir.setReturnValue(hasItemsToSend() || hasItemsToSendFacing()
                 || machine.appliedthermal$getProviderAttachment().isPatternTargetBusy());
         }
+    }
+
+    private boolean appliedthermal$isInstalledPattern(ICraftingPatternDetails requestedPattern) {
+        World world = iHost.getTileEntity().getWorld();
+        IItemHandler patterns = getPatterns();
+        for (int slot = 0; slot < patterns.getSlots(); slot++) {
+            ItemStack stack = patterns.getStackInSlot(slot);
+            if (stack.isEmpty() || !(stack.getItem() instanceof ICraftingPatternItem)) {
+                continue;
+            }
+            try {
+                ICraftingPatternDetails installed =
+                    ((ICraftingPatternItem) stack.getItem()).getPatternForItem(stack, world);
+                if (requestedPattern.equals(installed)) {
+                    return true;
+                }
+            } catch (RuntimeException ignored) {
+                // Invalid encoded patterns are ignored just like DualityInterface's pattern refresh.
+            }
+        }
+        return false;
     }
 }
