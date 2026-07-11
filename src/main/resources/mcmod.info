@@ -1,7 +1,7 @@
 [
   {
     "modid": "${mod_id}",
-    "name": "${mod_name}",
+    "name": "Applied Thermal | \u5e94\u7528\u70ed\u529b",
     "description": "${mod_description}",
     "version": "${mod_version}",
     "mcversion": "1.12.2",
