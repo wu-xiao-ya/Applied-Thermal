@@ -56,8 +56,14 @@ jobs:
       - name: Publish Thermal Expansion to Maven Local
         working-directory: deps/ThermalExpansion
         run: .\gradlew.bat --no-daemon publishToMavenLocal -x test
+      - name: Compile against Thermal 11.1
+        run: >
+          .\gradlew.bat --no-daemon clean compileJava --stacktrace
+          "-Pcofh_core_version=1.20.1-11.1.0.0"
+          "-Pthermal_core_version=1.20.1-11.1.0.0"
+          "-Pthermal_expansion_version=1.20.1-11.1.0.0"
       - name: Build addon
-        run: .\gradlew.bat --no-daemon build --stacktrace
+        run: .\gradlew.bat --no-daemon clean build --stacktrace
       - name: Resolve AppFlux optional runtime
         run: .\gradlew.bat --no-daemon verifyOptionalRuntime -Penable_appflux_runtime=true --stacktrace
       - name: Write SHA-256 checksums

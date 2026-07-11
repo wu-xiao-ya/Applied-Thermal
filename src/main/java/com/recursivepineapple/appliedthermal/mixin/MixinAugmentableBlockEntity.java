@@ -67,6 +67,14 @@ public abstract class MixinAugmentableBlockEntity {
         access.appliedthermal$getAttachmentLifecycle().ejectAndStop();
     }
 
+    @Inject(method = "onReplaced", at = @At("RETURN"))
+    private void appliedthermal$invalidateReplacedMachine(BlockState state,
+            Level level, net.minecraft.core.BlockPos pos, BlockState newState, CallbackInfo ci) {
+        if (!level.isClientSide() && (Object) this instanceof MachineBlockEntityAccess access) {
+            access.appliedthermal$invalidateHost();
+        }
+    }
+
     @Inject(method = "onInventoryChanged", at = @At("RETURN"))
     private void appliedthermal$syncAttachments(int slot, CallbackInfo ci) {
         Object self = this;
@@ -84,10 +92,4 @@ public abstract class MixinAugmentableBlockEntity {
         lifecycle.syncAugments(host);
     }
 
-    @Inject(method = "setRemoved", at = @At("HEAD"))
-    private void appliedthermal$setRemoved(CallbackInfo ci) {
-        if ((Object) this instanceof MachineBlockEntityAccess access) {
-            access.appliedthermal$invalidateHost();
-        }
-    }
 }

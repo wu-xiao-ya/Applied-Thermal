@@ -25,7 +25,6 @@ import appeng.helpers.patternprovider.PatternProviderLogic;
 import appeng.helpers.patternprovider.PatternProviderLogicHost;
 import cofh.lib.common.fluid.FluidStorageCoFH;
 import cofh.lib.common.inventory.ItemStorageCoFH;
-import cofh.thermal.lib.common.block.entity.MachineBlockEntity;
 import com.recursivepineapple.appliedthermal.attachment.MachineAttachment;
 import com.recursivepineapple.appliedthermal.init.ATItems;
 import com.recursivepineapple.appliedthermal.menu.AppliedThermalPatternProviderMenu;
@@ -564,19 +563,18 @@ public final class AppliedThermalProviderAttachment implements MachineAttachment
         logic.notifyStackReturnedToNetwork(new GenericStack(key, amount));
     }
 
-    @Nullable
-    private MachineBlockEntity getThermalMachine() {
-        return machine instanceof MachineBlockEntity thermalMachine ? thermalMachine : null;
-    }
-
     private List<? extends ItemStorageCoFH> getInputItemStorages() {
-        MachineBlockEntity thermalMachine = getThermalMachine();
-        return thermalMachine != null ? thermalMachine.inputSlots() : List.<ItemStorageCoFH>of();
+        if ((Object) machine instanceof AugmentableBlockEntityAccessor accessor) {
+            return accessor.appliedthermal$getMachineInventory().getInputSlots();
+        }
+        return List.of();
     }
 
     private List<? extends FluidStorageCoFH> getInputFluidStorages() {
-        MachineBlockEntity thermalMachine = getThermalMachine();
-        return thermalMachine != null ? thermalMachine.inputTanks() : List.<FluidStorageCoFH>of();
+        if ((Object) machine instanceof AugmentableBlockEntityAccessor accessor) {
+            return accessor.appliedthermal$getMachineTankInventory().getInputTanks();
+        }
+        return List.of();
     }
 
     private List<? extends ItemStorageCoFH> getOutputItemStorages() {

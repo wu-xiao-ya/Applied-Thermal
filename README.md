@@ -26,7 +26,7 @@ Applied Thermal is a Minecraft 1.20.1 Forge addon for AE2 and Thermal that adds 
 ## 安装
 
 1. 安装 Forge `47.1.47` 或更新的 47.x 版本。
-2. 安装 AE2 `15.4.10`、CoFH Core `11.1.0`、Thermal Core `11.1.0` 和 Thermal Expansion `11.1.0`。
+2. 安装 AE2 `15.4.10`、CoFH Core `11.0.2+`、Thermal Core `11.0.6+` 和 Thermal Expansion `11.0.1+`；同时兼容 11.1 系列。
 3. 需要网络自供电时，额外安装 AppFlux `1.20-1.3.7-forge` 及其依赖 Glodium。
 4. 合成样板供应升级并装入受支持的 Thermal 机器。
 
@@ -44,4 +44,4 @@ Applied Thermal is a Minecraft 1.20.1 Forge addon for AE2 and Thermal that adds 
 .\gradlew.bat --no-daemon runClient -Penable_appflux_runtime=true
 ```
 
-GitHub Actions 会从锁定提交构建 CoFH Core、Thermal Core 和 Thermal Expansion `11.1.0`，再构建本仓库。
+GitHub Actions 会先用锁定提交验证 CoFH/Thermal `11.1.0`，再以最低支持的 11.0 系列依赖构建发布产物。
