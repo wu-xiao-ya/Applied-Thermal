@@ -1,0 +1,11 @@
+{
+  "modmenu.nameTranslation.appliedthermal": "Applied Thermal",
+  "modmenu.descriptionTranslation.appliedthermal": "Adds an AE2-style pattern provider augment for supported Thermal machines.",
+  "item.appliedthermal.pattern_provider_augment": "Pattern Provider Augment",
+  "screen.appliedthermal.open_pattern_provider": "Open Pattern Provider",
+  "screen.appliedthermal.pattern_provider.title": "Pattern Provider",
+  "tooltip.appliedthermal.pattern_provider.output_return": "Toggle output return to network",
+  "tooltip.appliedthermal.pattern_provider.output_return.enabled": "Output return: enabled",
+  "tooltip.appliedthermal.pattern_provider.output_return.disabled": "Output return: disabled",
+  "tooltip.appliedthermal.pattern_provider.slots": "36 pattern slots"
+}

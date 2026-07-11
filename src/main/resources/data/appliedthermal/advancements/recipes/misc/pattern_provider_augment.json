@@ -1,0 +1,27 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_machine_frame": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "thermal:machine_frame"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "has_machine_frame"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "appliedthermal:pattern_provider_augment"
+    ]
+  }
+}

@@ -1,98 +1,65 @@
 package com.recursivepineapple.appliedthermal.provider;
 
-import ae2.api.config.Actionable;
-import ae2.api.config.BlockingMode;
-import ae2.api.config.PatternProviderBlockingType;
-import ae2.api.config.Settings;
-import ae2.api.crafting.IPatternDetails;
-import ae2.api.networking.IManagedGridNode;
-import ae2.api.stacks.AEKey;
-import ae2.api.stacks.KeyCounter;
-import ae2.crafting.pattern.AEProcessingPattern;
-import ae2.helpers.patternprovider.PatternProviderLogic;
-import ae2.helpers.patternprovider.PatternProviderLogicHost;
-import ae2.helpers.patternprovider.PseudoPatternDetails;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
-import net.minecraft.item.Item;
+import appeng.api.config.Settings;
+import appeng.api.config.YesNo;
+import appeng.api.crafting.IPatternDetails;
+import appeng.api.networking.IManagedGridNode;
+import appeng.api.stacks.GenericStack;
+import appeng.api.stacks.KeyCounter;
+import appeng.crafting.pattern.AEProcessingPattern;
+import appeng.helpers.patternprovider.PatternProviderLogic;
+import com.recursivepineapple.appliedthermal.mixin.PatternProviderLogicAccessor;
 
+/**
+ * AE2 pattern-provider logic used by a Thermal machine attachment.
+ *
+ * <p>Thermal machines are generic processing targets rather than AE2 crafting
+ * machines. The whole selected input set is therefore checked before anything
+ * is inserted into the machine.</p>
+ */
 public final class ThermalMachinePatternProviderLogic extends PatternProviderLogic {
 
     private final AppliedThermalProviderAttachment attachment;
-    private boolean hasLastSuccessfulPatternHash;
-    private int lastSuccessfulPatternHash;
 
-    public ThermalMachinePatternProviderLogic(IManagedGridNode mainNode, PatternProviderLogicHost host, Item machineType,
-                                              int patternInventorySize,
-                                              AppliedThermalProviderAttachment attachment) {
-        super(mainNode, host, machineType, patternInventorySize);
+    public ThermalMachinePatternProviderLogic(IManagedGridNode mainNode,
+            AppliedThermalProviderAttachment attachment) {
+        super(mainNode, attachment, 36);
         this.attachment = attachment;
     }
 
     @Override
-    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder, int multiplier) {
-        IPatternDetails basePatternDetails = PseudoPatternDetails.unwrap(patternDetails);
-        if (!attachment.isEnabled() || !getAvailablePatterns().contains(patternDetails)
-            && !getAvailablePatterns().contains(basePatternDetails)) {
+    public boolean pushPattern(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
+        if (!attachment.isEnabled()
+                || !getAvailablePatterns().contains(patternDetails)
+                || !(patternDetails instanceof AEProcessingPattern)
+                || isBusy()
+                || isBlocked()) {
             return false;
         }
-        if (!(basePatternDetails instanceof AEProcessingPattern) || multiplier != 1) {
+
+        if (!attachment.commitInputs(inputHolder)) {
             return false;
         }
-        if (isBlocked(basePatternDetails, inputHolder)) {
-            return false;
-        }
-        if (!attachment.canAcceptInputs(inputHolder)) {
-            return false;
-        }
-        basePatternDetails.pushInputsToExternalInventory(inputHolder,
-            (what, amount) -> attachment.insertInput(what, amount, Actionable.MODULATE));
-        this.hasLastSuccessfulPatternHash = true;
-        this.lastSuccessfulPatternHash = getPatternHash(basePatternDetails);
+
+        ((PatternProviderLogicAccessor) (Object) this).appliedthermal$onPushPatternSuccess(patternDetails);
         saveChanges();
         return true;
     }
 
     @Override
-    public boolean canMergePatternPush(IPatternDetails patternDetails) {
-        return false;
-    }
-
-    @Override
-    public int getMaxPatternPushMultiplier(IPatternDetails patternDetails, int maxMultiplier) {
-        return 0;
-    }
-
-    @Override
     public boolean isBusy() {
-        return false;
+        return super.isBusy() || isBlocked();
     }
 
-    private boolean isBlocked(IPatternDetails patternDetails, KeyCounter[] inputHolder) {
-        BlockingMode mode = getConfigManager().getSetting(Settings.BLOCKING_MODE);
-        if (mode == BlockingMode.NO || shouldBypassSmartBlocking(patternDetails)) {
-            return false;
-        }
-        if (mode == BlockingMode.STRONG) {
-            for (KeyCounter counter : inputHolder) {
-                for (Object2LongMap.Entry<AEKey> input : counter) {
-                    if (attachment.containsInput(input.getKey())) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-        return attachment.containsAnyInput();
+    void notifyStackReturnedToNetwork(GenericStack stack) {
+        ((PatternProviderLogicAccessor) (Object) this).appliedthermal$onStackReturnedToNetwork(stack);
     }
 
-    private boolean shouldBypassSmartBlocking(IPatternDetails patternDetails) {
-        return getConfigManager().getSetting(Settings.PATTERN_PROVIDER_BLOCKING_TYPE)
-            == PatternProviderBlockingType.SMART
-            && hasLastSuccessfulPatternHash
-            && lastSuccessfulPatternHash == getPatternHash(patternDetails);
+    private boolean isBlocked() {
+        return getConfigManager().getSetting(Settings.BLOCKING_MODE) == YesNo.YES
+                && (attachment.containsAnyInput()
+                        || attachment.hasOutputItems()
+                        || attachment.hasOutputFluids());
     }
 
-    private int getPatternHash(IPatternDetails patternDetails) {
-        return patternDetails.getDefinition().hashCode();
-    }
 }

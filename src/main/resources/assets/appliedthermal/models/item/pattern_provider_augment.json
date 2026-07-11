@@ -1,6 +1,6 @@
 {
-  "parent": "item/generated",
+  "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "appliedthermal:items/pattern_provider_augment"
+    "layer0": "appliedthermal:item/pattern_provider_augment"
   }
 }

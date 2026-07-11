@@ -1,53 +1,90 @@
 package com.recursivepineapple.appliedthermal.client;
 
-import ae2.api.client.PatternProviderGuiInitEvent;
+import appeng.init.client.InitScreens;
+import cofh.thermal.lib.client.gui.MachineScreen;
+import cofh.thermal.lib.common.block.entity.MachineBlockEntity;
 import com.recursivepineapple.appliedthermal.AppliedThermal;
-import com.recursivepineapple.appliedthermal.client.gui.GuiOutputReturnButton;
+import com.recursivepineapple.appliedthermal.client.gui.AppliedThermalPatternProviderScreen;
+import com.recursivepineapple.appliedthermal.client.gui.ThermalPatternProviderButton;
 import com.recursivepineapple.appliedthermal.init.ATItems;
-import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
+import com.recursivepineapple.appliedthermal.menu.ATMenus;
 import com.recursivepineapple.appliedthermal.network.ATNetwork;
-import com.recursivepineapple.appliedthermal.network.MessageToggleOutputReturn;
-import com.recursivepineapple.appliedthermal.provider.AppliedThermalProviderAttachment;
-import net.minecraft.client.renderer.block.model.ModelResourceLocation;
-import net.minecraftforge.client.event.ModelRegistryEvent;
-import net.minecraftforge.client.model.ModelLoader;
+import java.lang.reflect.Field;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.ScreenEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
-import net.minecraftforge.fml.relauncher.Side;
-import net.minecraftforge.fml.relauncher.SideOnly;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
-@SideOnly(Side.CLIENT)
-@Mod.EventBusSubscriber(modid = AppliedThermal.MOD_ID, value = Side.CLIENT)
 public final class ATClientEvents {
+
+    private static final Field MACHINE_TILE = findMachineTileField();
 
     private ATClientEvents() {
     }
 
-    @SubscribeEvent
-    public static void registerItemModels(ModelRegistryEvent event) {
-        ModelLoader.setCustomModelResourceLocation(
-            ATItems.getPatternProviderAugment(),
-            0,
-            new ModelResourceLocation(ATItems.getPatternProviderAugment().getRegistryName(), "inventory"));
-    }
+    @Mod.EventBusSubscriber(modid = AppliedThermal.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD,
+            value = Dist.CLIENT)
+    public static final class ModBus {
 
-    @SubscribeEvent
-    public static void initializePatternProviderGui(PatternProviderGuiInitEvent event) {
-        if (!(event.getHost() instanceof AppliedThermalMachine)) {
-            return;
+        private ModBus() {
         }
 
-        AppliedThermalProviderAttachment attachment =
-            ((AppliedThermalMachine) event.getHost()).appliedthermal$getProviderAttachment();
-        event.addToLeftToolbar(new GuiOutputReturnButton(
-            attachment::shouldReturnOutputsToNetwork,
-            () -> toggleOutputReturn(attachment)));
+        @SubscribeEvent
+        public static void clientSetup(FMLClientSetupEvent event) {
+            event.enqueueWork(() -> InitScreens.register(
+                    ATMenus.PATTERN_PROVIDER,
+                    AppliedThermalPatternProviderScreen::new,
+                    "/screens/appliedthermal_pattern_provider.json"));
+        }
     }
 
-    private static void toggleOutputReturn(AppliedThermalProviderAttachment attachment) {
-        boolean next = !attachment.shouldReturnOutputsToNetwork();
-        attachment.setReturnOutputsToNetwork(next);
-        ATNetwork.CHANNEL.sendToServer(new MessageToggleOutputReturn(
-            attachment.getTileEntity().getPos(), next));
+    @Mod.EventBusSubscriber(modid = AppliedThermal.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE,
+            value = Dist.CLIENT)
+    public static final class ForgeBus {
+
+        private ForgeBus() {
+        }
+
+        @SubscribeEvent
+        public static void addMachineButton(ScreenEvent.Init.Post event) {
+            Screen screen = event.getScreen();
+            if (!(screen instanceof MachineScreen<?> machineScreen)) {
+                return;
+            }
+            BlockEntity tile = getMachineTile(machineScreen);
+            if (!(tile instanceof MachineBlockEntity)) {
+                return;
+            }
+
+            var menu = machineScreen.getMenu();
+            var button = new ThermalPatternProviderButton(
+                    machineScreen.guiLeft() + 178,
+                    machineScreen.guiTop() + 30,
+                    () -> menu.getAugmentSlots().stream()
+                            .anyMatch(slot -> slot.getItem().is(ATItems.getPatternProviderAugment())),
+                    ignored -> ATNetwork.openPatternProvider(tile.getBlockPos()));
+            event.addListener(button);
+        }
+    }
+
+    private static Field findMachineTileField() {
+        try {
+            Field field = MachineScreen.class.getDeclaredField("tile");
+            field.setAccessible(true);
+            return field;
+        } catch (ReflectiveOperationException ex) {
+            throw new IllegalStateException("Unable to access Thermal machine screen host", ex);
+        }
+    }
+
+    private static BlockEntity getMachineTile(MachineScreen<?> screen) {
+        try {
+            return (BlockEntity) MACHINE_TILE.get(screen);
+        } catch (IllegalAccessException ex) {
+            throw new IllegalStateException("Unable to read Thermal machine screen host", ex);
+        }
     }
 }

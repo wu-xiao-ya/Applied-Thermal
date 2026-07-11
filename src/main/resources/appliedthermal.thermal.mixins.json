@@ -1,19 +1,15 @@
 {
-  "required": false,
+  "required": true,
   "minVersion": "0.8",
   "package": "com.recursivepineapple.appliedthermal.mixin",
-  "compatibilityLevel": "JAVA_8",
-  "plugin": "com.recursivepineapple.appliedthermal.core.AppliedThermalMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "MixinTileMachineBase",
-    "MixinTileCore",
-    "MixinTilePowered",
-    "MixinBlockMachine",
-    "MixinContainerTileAugmentable"
+    "AugmentableBlockEntityAccessor",
+    "MixinMachineBlockEntity",
+    "MixinAugmentableBlockEntity"
   ],
-  "client": [
-    "MixinGuiPoweredBase"
-  ],
+  "client": [],
+  "server": [],
   "injectors": {
     "defaultRequire": 1
   }

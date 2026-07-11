@@ -1,0 +1,11 @@
+{
+  "modmenu.nameTranslation.appliedthermal": "应用热力",
+  "modmenu.descriptionTranslation.appliedthermal": "为受支持的 Thermal 机器添加 AE2 风格的样板供应升级。",
+  "item.appliedthermal.pattern_provider_augment": "样板供应升级",
+  "screen.appliedthermal.open_pattern_provider": "打开样板供应器",
+  "screen.appliedthermal.pattern_provider.title": "样板供应器",
+  "tooltip.appliedthermal.pattern_provider.output_return": "切换产物回网",
+  "tooltip.appliedthermal.pattern_provider.output_return.enabled": "产物回网：开启",
+  "tooltip.appliedthermal.pattern_provider.output_return.disabled": "产物回网：关闭",
+  "tooltip.appliedthermal.pattern_provider.slots": "36 个样板槽位"
+}

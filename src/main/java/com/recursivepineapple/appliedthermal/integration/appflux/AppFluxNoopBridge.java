@@ -1,10 +1,8 @@
 package com.recursivepineapple.appliedthermal.integration.appflux;
 
-import cofh.thermalexpansion.block.machine.TileMachineBase;
-import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
-import javax.annotation.Nullable;
-import net.minecraft.item.Item;
-import net.minecraft.nbt.NBTTagCompound;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.storage.MEStorage;
+import net.minecraft.world.level.ItemLike;
 
 final class AppFluxNoopBridge implements AppFluxBridge {
 
@@ -14,34 +12,21 @@ final class AppFluxNoopBridge implements AppFluxBridge {
     }
 
     @Override
-    public boolean isAvailable() {
+    public boolean isPresent() {
         return false;
     }
 
     @Override
-    @Nullable
-    public Item getInductionCardItem() {
-        return null;
+    public void registerUpgrade(ItemLike machineIcon) {
     }
 
     @Override
-    public void onLoad(TileMachineBase tile) {
+    public boolean hasInductionCard(Object providerLogic) {
+        return false;
     }
 
     @Override
-    public void onUnload(TileMachineBase tile) {
-    }
-
-    @Override
-    public void readFromNBT(TileMachineBase tile, NBTTagCompound tag) {
-    }
-
-    @Override
-    public void writeToNBT(TileMachineBase tile, NBTTagCompound tag) {
-    }
-
-    @Override
-    public long extractEnergyFromGrid(AppliedThermalMachine machine, long amount, boolean simulate) {
-        return 0;
+    public long transferEnergy(Object machine, MEStorage storage, IActionSource source) {
+        return 0L;
     }
 }

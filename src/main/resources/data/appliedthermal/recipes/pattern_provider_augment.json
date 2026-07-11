@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "RCR",
+    "FPF",
+    "RFR"
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "C": {
+      "item": "ae2:logic_processor"
+    },
+    "F": {
+      "item": "thermal:machine_frame"
+    },
+    "P": {
+      "item": "minecraft:piston"
+    }
+  },
+  "result": {
+    "item": "appliedthermal:pattern_provider_augment",
+    "count": 1
+  }
+}

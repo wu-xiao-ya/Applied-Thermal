@@ -1,46 +1,35 @@
 package com.recursivepineapple.appliedthermal;
 
 import com.recursivepineapple.appliedthermal.init.ATItems;
-import com.recursivepineapple.appliedthermal.integration.thermal.ThermalMachineAugments;
-import com.recursivepineapple.appliedthermal.network.ATGuiHandler;
+import com.recursivepineapple.appliedthermal.menu.ATMenus;
 import com.recursivepineapple.appliedthermal.network.ATNetwork;
+import cofh.thermal.lib.util.ThermalAugmentRules;
+import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.Mod.EventHandler;
-import net.minecraftforge.fml.common.event.FMLInitializationEvent;
-import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
-import net.minecraftforge.fml.common.network.NetworkRegistry;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-@Mod(
-    modid = AppliedThermal.MOD_ID,
-    name = AppliedThermal.MOD_NAME,
-    version = AppliedThermal.VERSION,
-    dependencies = AppliedThermal.DEPENDENCIES,
-    acceptedMinecraftVersions = "[1.12.2]")
+@Mod(AppliedThermal.MOD_ID)
 public final class AppliedThermal {
 
     public static final String MOD_ID = "appliedthermal";
-    public static final String MOD_NAME = "Applied Thermal | 应用热力";
-    public static final String VERSION = "0.1.0";
-    public static final String DEPENDENCIES =
-        "required-after:ae2;required-after:thermalexpansion;required-after:cofhcore;required-after:thermalfoundation;"
-            + "after:appflux";
+    public static final String MOD_NAME = "Applied Thermal";
+    public static final String VERSION = "1.20.1-0.1.0";
 
     public static final Logger LOG = LogManager.getLogger(MOD_ID);
 
-    @Mod.Instance(MOD_ID)
-    public static AppliedThermal instance;
-
-    @EventHandler
-    public void preInit(FMLPreInitializationEvent event) {
-        ATItems.preInit();
-        ATNetwork.preInit(event.getSide());
-        NetworkRegistry.INSTANCE.registerGuiHandler(instance, new ATGuiHandler());
+    public AppliedThermal() {
+        IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        ATItems.register(modEventBus);
+        ATMenus.init();
+        ATNetwork.init();
+        modEventBus.addListener(this::commonSetup);
     }
 
-    @EventHandler
-    public void init(FMLInitializationEvent event) {
-        ThermalMachineAugments.registerMachineAugment();
+    private void commonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() ->
+                ThermalAugmentRules.flagUniqueAugment(ATItems.getPatternProviderAugment()));
     }
 }

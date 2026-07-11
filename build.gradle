@@ -1,8 +1,23 @@
-plugins {
-    id "java"
-    id "java-library"
-    id "xyz.wagyourtail.unimined" version "1.4.23-kappa"
+buildscript {
+    repositories {
+        maven {
+            name = "Forge"
+            url = "https://maven.minecraftforge.net"
+        }
+        mavenCentral()
+    }
+    dependencies {
+        classpath "net.minecraftforge.gradle:ForgeGradle:6.0.54"
+    }
 }
+
+plugins {
+    id "java-library"
+    id "eclipse"
+    id "maven-publish"
+}
+
+apply plugin: "net.minecraftforge.gradle"
 
 group = mod_group
 version = mod_version
@@ -13,149 +28,170 @@ base {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(java_version as int)
     }
     withSourcesJar()
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.release = 8
+sourceSets {
+    main {
+        resources.srcDir "src/generated/resources"
+    }
 }
 
 repositories {
     mavenLocal()
     maven {
-        name = "CleanroomMC"
-        url = "https://maven.cleanroommc.com"
-    }
-    maven {
-        name = "MinecraftForge"
-        url = "https://maven.minecraftforge.net/"
-        metadataSources {
-            mavenPom()
-            artifact()
-        }
-    }
-    maven {
-        name = "Sponge"
-        url = "https://repo.spongepowered.org/maven"
-        metadataSources {
-            mavenPom()
-            artifact()
-        }
-    }
-    maven {
-        name = "CurseMaven"
-        url = "https://cursemaven.com"
-    }
-    maven {
-        name = "CleanroomCurseMaven"
-        url = "https://curse.cleanroommc.com"
+        name = "Forge"
+        url = "https://maven.minecraftforge.net"
     }
     maven {
         name = "ModMaven"
         url = "https://modmaven.dev"
     }
     maven {
-        name = "CoFH"
-        url = "https://maven.covers1624.net"
-    }
-    maven {
-        name = "JitPack"
-        url = "https://www.jitpack.io"
-        content {
-            includeGroupByRegex("com\\.github\\..*")
-        }
-    }
-    ivy {
-        name = "AE2SDevRelease"
-        url = uri("https://github.com/FormlessDragon/Applied-Energistics-2-Supergiant/releases/download/dev")
-        patternLayout {
-            artifact("[artifact]-[revision](-[classifier]).[ext]")
-        }
-        metadataSources {
-            artifact()
-        }
-        content {
-            includeGroup("dev.ae2s")
-        }
-    }
-    maven {
-        name = "FirstDarkDev"
-        url = "https://maven.firstdarkdev.xyz/releases/"
-    }
-    maven {
-        name = "WagYourMaven"
-        url = "https://maven.wagyourtail.xyz/releases"
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
     }
     mavenCentral()
 }
 
-configurations {
-    modCompileOnly
-    compileOnly.extendsFrom(modCompileOnly)
-    modRuntimeOnly
-    runtimeOnly.extendsFrom(modRuntimeOnly)
-}
+minecraft {
+    mappings channel: "official", version: minecraft_version
+    accessTransformer = file("src/main/resources/META-INF/accesstransformer.cfg")
 
-unimined.minecraft {
-    version "1.12.2"
-
-    mappings {
-        mcp("stable", "39-1.12")
-    }
-
-    cleanroom {
-        loader "0.5.14-alpha"
-        runs.auth.username = "Dev"
-        runs.all {
-            systemProperty("crl.dev.mixin", "appliedthermal.ae.mixins.json")
-            systemProperty("mixin.debug.export", "true")
-            systemProperty("fml.coreMods.load", "com.recursivepineapple.appliedthermal.core.AppliedThermalCore")
+    runs {
+        configureEach {
+            property "mixin.env.remapRefMap", "true"
+            property "mixin.env.refMapRemappingFile",
+                    file("${buildDir}/createSrgToMcp/output.srg").absolutePath
+            arg "-mixin.config=appliedthermal.ae.mixins.json"
+            arg "-mixin.config=appliedthermal.thermal.mixins.json"
         }
-    }
 
-    defaultRemapJar = true
+        client {
+            workingDirectory project.file("run")
+            property "forge.logging.console.level", "debug"
+            mods {
+                appliedthermal {
+                    source sourceSets.main
+                }
+            }
+        }
 
-    mods {
-        remap(configurations.modCompileOnly)
-        remap(configurations.modRuntimeOnly)
+        server {
+            workingDirectory project.file("run")
+            property "forge.logging.console.level", "debug"
+            mods {
+                appliedthermal {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        data {
+            workingDirectory project.file("run")
+            args "--mod", mod_id, "--all", "--output", file("src/generated/resources"), "--existing", file("src/main/resources")
+            mods {
+                appliedthermal {
+                    source sourceSets.main
+                }
+            }
+        }
     }
 }
 
 dependencies {
-    compileOnly "com.cleanroommc:sponge-mixin:0.20.12+mixin.0.8.7"
-    compileOnly "zone.rong:mixinbooter:10.7"
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    modCompileOnly "dev.ae2s:AppliedEnergistics2-Supergiant:1.0.9+278077b98:dev@jar"
-    modCompileOnly "curse.maven:CoFHCore-69162:2920433"
-    modCompileOnly "curse.maven:ThermalFoundation-222880:2926428"
-    modCompileOnly "curse.maven:ThermalExpansion-69163:2926431"
-    modCompileOnly "cofh:RedstoneFlux:1.12-2.1.0.+:universal"
-    modCompileOnly "curse.maven:codechicken-lib-1-8-242818:2779848"
-    modCompileOnly "mezz:jei:4.31.2"
+    compileOnly fg.deobf("appeng:appliedenergistics2-forge:${ae2_version}")
+    runtimeOnly fg.deobf("appeng:appliedenergistics2-forge:${ae2_version}")
+    compileOnly fg.deobf("org.appliedenergistics:guideme:${guideme_version}")
+    runtimeOnly fg.deobf("org.appliedenergistics:guideme:${guideme_version}")
+
+    compileOnly fg.deobf("com.teamcofh:cofh_core:${cofh_core_version}")
+    runtimeOnly fg.deobf("com.teamcofh:cofh_core:${cofh_core_version}")
+
+    compileOnly fg.deobf("com.teamcofh:thermal_core:${thermal_core_version}")
+    runtimeOnly fg.deobf("com.teamcofh:thermal_core:${thermal_core_version}")
+
+    compileOnly fg.deobf("com.teamcofh:thermal_expansion:${thermal_expansion_version}")
+    runtimeOnly fg.deobf("com.teamcofh:thermal_expansion:${thermal_expansion_version}")
+
+    compileOnly("maven.modrinth:appflux:${appflux_version}") {
+        transitive = false
+    }
+    if (providers.gradleProperty("enable_appflux_runtime").orNull == "true") {
+        runtimeOnly fg.deobf("maven.modrinth:appflux:${appflux_version}")
+        runtimeOnly fg.deobf("maven.modrinth:glodium:${glodium_version}")
+    }
+
+    compileOnly "org.spongepowered:mixin:0.8.5"
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+}
+
+tasks.register("verifyOptionalRuntime") {
+    doLast {
+        if (providers.gradleProperty("enable_appflux_runtime").orNull != "true") {
+            throw new GradleException("Run with -Penable_appflux_runtime=true")
+        }
+        def runtimeFiles = configurations.runtimeClasspath.resolve()
+        if (!runtimeFiles.any { it.name.toLowerCase(Locale.ROOT).contains("appflux") }
+                || !runtimeFiles.any { it.name.toLowerCase(Locale.ROOT).contains("glodium") }) {
+            throw new GradleException("AppFlux or Glodium is missing from runtimeClasspath")
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = "UTF-8"
+    options.release = java_version as int
 }
 
 processResources {
-    inputs.property("mod_id", mod_id)
-    inputs.property("mod_name", mod_name)
-    inputs.property("mod_version", mod_version)
-    inputs.property("mod_description", mod_description)
-    inputs.property("mod_url", mod_url)
-    inputs.property("mod_update_url", mod_update_url)
-    inputs.property("mod_authors", mod_authors)
-    inputs.property("mod_credits", mod_credits)
+    inputs.properties(
+        mod_id: mod_id,
+        mod_name: mod_name,
+        mod_version: mod_version,
+        mod_description: mod_description,
+        mod_url: mod_url,
+        mod_license: mod_license,
+        mod_authors: mod_authors,
+        mod_credits: mod_credits,
+        minecraft_version: minecraft_version,
+        forge_version: forge_version,
+        ae2_version: ae2_version,
+        cofh_core_version: cofh_core_version,
+        thermal_core_version: thermal_core_version,
+        thermal_expansion_version: thermal_expansion_version,
+        appflux_version: appflux_version,
+        glodium_version: glodium_version,
+        loader_version_range: loader_version_range,
+        minecraft_version_range: minecraft_version_range,
+        forge_version_range: forge_version_range
+    )
 
-    filesMatching(["mcmod.info", "pack.mcmeta"]) {
+    filesMatching(["META-INF/mods.toml", "pack.mcmeta"]) {
         expand(
             mod_id: mod_id,
             mod_name: mod_name,
             mod_version: mod_version,
             mod_description: mod_description,
             mod_url: mod_url,
-            mod_update_url: mod_update_url,
+            mod_license: mod_license,
             mod_authors: mod_authors,
-            mod_credits: mod_credits
+            mod_credits: mod_credits,
+            minecraft_version: minecraft_version,
+            forge_version: forge_version,
+            ae2_version: ae2_version,
+            cofh_core_version: cofh_core_version,
+            thermal_core_version: thermal_core_version,
+            thermal_expansion_version: thermal_expansion_version,
+            appflux_version: appflux_version,
+            glodium_version: glodium_version,
+            loader_version_range: loader_version_range,
+            minecraft_version_range: minecraft_version_range,
+            forge_version_range: forge_version_range
         )
     }
 }
@@ -163,9 +199,13 @@ processResources {
 jar {
     manifest {
         attributes(
-            "FMLCorePlugin": "com.recursivepineapple.appliedthermal.core.AppliedThermalCore",
-            "FMLCorePluginContainsFMLMod": "true",
-            "ForceLoadAsMod": "true"
+            "Specification-Title": mod_name,
+            "Specification-Vendor": mod_authors,
+            "Specification-Version": mod_version,
+            "Implementation-Title": mod_name,
+            "Implementation-Version": mod_version,
+            "Implementation-Vendor": mod_authors,
+            "MixinConfigs": "appliedthermal.ae.mixins.json,appliedthermal.thermal.mixins.json"
         )
     }
 }

@@ -1,130 +1,239 @@
 package com.recursivepineapple.appliedthermal.integration.appflux;
 
-import ae2.api.config.Actionable;
-import ae2.api.networking.IGrid;
-import ae2.api.networking.security.IActionHost;
-import ae2.api.networking.security.IActionSource;
-import ae2.api.networking.storage.IStorageService;
-import cofh.thermalexpansion.block.machine.TileMachineBase;
-import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
+import appeng.api.config.Actionable;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.stacks.AEKey;
+import appeng.api.storage.MEStorage;
+import appeng.api.upgrades.Upgrades;
+import appeng.api.upgrades.IUpgradeableObject;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import javax.annotation.Nullable;
-import net.minecraft.item.Item;
-import net.minecraft.nbt.NBTTagCompound;
+import java.lang.reflect.Modifier;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.ItemLike;
+import net.minecraftforge.common.capabilities.ForgeCapabilities;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 final class ReflectiveAppFluxBridge implements AppFluxBridge {
 
-    private static final String AF_ITEMS = "com.glodblock.github.appflux.common.AFItemAndBlock";
-    private static final String AF_ITEM_FIELD = "INDUCTION_CARD";
-    private static final String FLUX_KEY = "com.glodblock.github.appflux.common.me.key.FluxKey";
-    private static final String ENERGY_TYPE = "com.glodblock.github.appflux.common.me.key.type.EnergyType";
+    private static final Logger LOG = LogManager.getLogger();
+    private static final String APPFLUX_ITEM_AND_BLOCK = "com.glodblock.github.appflux.common.AFItemAndBlock";
+    private static final String APPFLUX_FLUX_KEY = "com.glodblock.github.appflux.common.me.key.FluxKey";
+    private static final String APPFLUX_ENERGY_TYPE = "com.glodblock.github.appflux.common.me.key.type.EnergyType";
 
-    @Nullable
-    private final Item inductionCard;
-    @Nullable
-    private final Object fluxKeyFe;
-    @Nullable
-    private final Method extractMethod;
-    @Nullable
-    private final Method insertMethod;
+    private final AEKey fluxFeKey;
+    private final ItemLike inductionCard;
+    private final Map<Class<?>, Optional<EnergyAccessor>> accessorCache = new ConcurrentHashMap<Class<?>, Optional<EnergyAccessor>>();
 
-    ReflectiveAppFluxBridge() {
-        this.inductionCard = resolveInductionCard();
-        this.fluxKeyFe = resolveFluxKeyFe();
-        Method[] methods = resolveStorageMethods();
-        this.extractMethod = methods[0];
-        this.insertMethod = methods[1];
+    private ReflectiveAppFluxBridge(AEKey fluxFeKey, ItemLike inductionCard) {
+        this.fluxFeKey = fluxFeKey;
+        this.inductionCard = inductionCard;
     }
 
-    @Override
-    public boolean isAvailable() {
-        return inductionCard != null && fluxKeyFe != null && extractMethod != null && insertMethod != null;
-    }
-
-    @Override
-    @Nullable
-    public Item getInductionCardItem() {
-        return inductionCard;
-    }
-
-    @Override
-    public void onLoad(TileMachineBase tile) {
-    }
-
-    @Override
-    public void onUnload(TileMachineBase tile) {
-    }
-
-    @Override
-    public void readFromNBT(TileMachineBase tile, NBTTagCompound tag) {
-    }
-
-    @Override
-    public void writeToNBT(TileMachineBase tile, NBTTagCompound tag) {
-    }
-
-    @Override
-    public long extractEnergyFromGrid(AppliedThermalMachine machine, long amount, boolean simulate) {
-        if (amount <= 0 || !isAvailable()) {
-            return 0;
-        }
-        IStorageService storage = getStorage(machine);
-        if (storage == null) {
-            return 0;
-        }
+    static Optional<AppFluxBridge> create() {
         try {
-            Object inventory = storage.getInventory();
-            Object result = extractMethod.invoke(inventory, fluxKeyFe, amount,
-                simulate ? Actionable.SIMULATE : Actionable.MODULATE,
-                IActionSource.ofMachine((IActionHost) machine));
-            return result instanceof Number ? ((Number) result).longValue() : 0L;
-        } catch (ReflectiveOperationException ignored) {
-            return 0;
+            Class<?> itemAndBlockClass = Class.forName(APPFLUX_ITEM_AND_BLOCK);
+            Field inductionCardField = itemAndBlockClass.getField("INDUCTION_CARD");
+            Object inductionCard = inductionCardField.get(null);
+            if (!(inductionCard instanceof ItemLike itemLike)) {
+                return Optional.empty();
+            }
+
+            Class<?> fluxKeyClass = Class.forName(APPFLUX_FLUX_KEY);
+            Class<?> energyTypeClass = Class.forName(APPFLUX_ENERGY_TYPE);
+            Object feEnum = Enum.valueOf((Class<? extends Enum>) energyTypeClass.asSubclass(Enum.class), "FE");
+            Method ofMethod = fluxKeyClass.getMethod("of", energyTypeClass);
+            Object fluxKey = ofMethod.invoke(null, feEnum);
+            if (!(fluxKey instanceof AEKey aeKey)) {
+                return Optional.empty();
+            }
+
+            return Optional.of(new ReflectiveAppFluxBridge(aeKey, itemLike));
+        } catch (ReflectiveOperationException | LinkageError ex) {
+            LOG.warn("AppFlux integration unavailable: {}", ex.getMessage());
+            return Optional.empty();
         }
     }
 
-    @Nullable
-    private static IStorageService getStorage(AppliedThermalMachine machine) {
-        IGrid grid = machine.appliedthermal$getProviderAttachment().getGrid();
-        return grid == null ? null : grid.getStorageService();
+    @Override
+    public boolean isPresent() {
+        return true;
     }
 
-    @Nullable
-    private static Item resolveInductionCard() {
+    @Override
+    public void registerUpgrade(ItemLike machineIcon) {
+        if (machineIcon == null) {
+            return;
+        }
+
+        Upgrades.add(inductionCard, machineIcon, 1);
+    }
+
+    @Override
+    public boolean hasInductionCard(Object providerLogic) {
+        return providerLogic instanceof IUpgradeableObject upgradeable
+                && upgradeable.getUpgrades().isInstalled(inductionCard);
+    }
+
+    @Override
+    public long transferEnergy(Object machine, MEStorage storage, IActionSource source) {
+        Object energyStorage = findEnergyStorage(machine);
+        if (energyStorage == null) {
+            return 0L;
+        }
+
+        int room = invokeInt(energyStorage, "receiveEnergy", Integer.MAX_VALUE, true);
+        if (room <= 0) {
+            return 0L;
+        }
+
+        long simulated = storage.extract(fluxFeKey, room, Actionable.SIMULATE, source);
+        if (simulated <= 0L) {
+            return 0L;
+        }
+
+        long extracted = storage.extract(fluxFeKey, simulated, Actionable.MODULATE, source);
+        if (extracted <= 0L) {
+            return 0L;
+        }
+
+        int accepted = invokeInt(energyStorage, "receiveEnergy", (int) Math.min(extracted, Integer.MAX_VALUE), false);
+        long refund = Math.max(0L, extracted - accepted);
+        if (refund > 0L) {
+            long returned = storage.insert(fluxFeKey, refund, Actionable.MODULATE, source);
+            if (returned > 0L) {
+                LOG.debug("Refunded {} FE to ME network after Thermal machine accepted only {} FE", returned, accepted);
+            }
+        }
+
+        return accepted;
+    }
+
+    private Object findEnergyStorage(Object machine) {
+        if (machine == null) {
+            return null;
+        }
+
+        if (machine instanceof BlockEntity blockEntity) {
+            Object storage = blockEntity.getCapability(ForgeCapabilities.ENERGY, null).orElse(null);
+            if (isEnergyStorage(storage)) {
+                return storage;
+            }
+        }
+
+        Optional<EnergyAccessor> cached = accessorCache.computeIfAbsent(machine.getClass(),
+                ReflectiveAppFluxBridge::discoverAccessor);
+        if (cached.isEmpty()) {
+            return null;
+        }
+
         try {
-            Class<?> afItems = Class.forName(AF_ITEMS);
-            Field field = afItems.getField(AF_ITEM_FIELD);
-            return (Item) field.get(null);
-        } catch (ReflectiveOperationException ignored) {
+            Object value = cached.get().get(machine);
+            return isEnergyStorage(value) ? value : null;
+        } catch (ReflectiveOperationException ex) {
             return null;
         }
     }
 
-    @Nullable
-    private static Object resolveFluxKeyFe() {
+    private static Optional<EnergyAccessor> discoverAccessor(Class<?> type) {
+        for (Class<?> cursor = type; cursor != null; cursor = cursor.getSuperclass()) {
+            for (Method method : cursor.getDeclaredMethods()) {
+                if (method.getParameterCount() != 0 || Modifier.isStatic(method.getModifiers())) {
+                    continue;
+                }
+                String name = method.getName().toLowerCase(Locale.ROOT);
+                if (!name.contains("energy")) {
+                    continue;
+                }
+                method.setAccessible(true);
+                return Optional.of(new MethodAccessor(method));
+            }
+
+            for (Field field : cursor.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers())) {
+                    continue;
+                }
+
+                String name = field.getName().toLowerCase(Locale.ROOT);
+                String typeName = field.getType().getSimpleName().toLowerCase(Locale.ROOT);
+                if (!name.contains("energy") && !typeName.contains("energy")) {
+                    continue;
+                }
+
+                field.setAccessible(true);
+                return Optional.of(new FieldAccessor(field));
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private static boolean isEnergyStorage(Object value) {
+        if (value == null) {
+            return false;
+        }
+
+        Class<?> type = value.getClass();
+        return hasMethod(type, "receiveEnergy", int.class, boolean.class)
+                && hasMethod(type, "getEnergyStored")
+                && hasMethod(type, "getMaxEnergyStored");
+    }
+
+    private static boolean hasMethod(Class<?> type, String name, Class<?>... parameterTypes) {
         try {
-            Class<?> energyTypeClass = Class.forName(ENERGY_TYPE);
-            Object feType = Enum.valueOf((Class<Enum>) energyTypeClass.asSubclass(Enum.class), "FE");
-            Class<?> fluxKeyClass = Class.forName(FLUX_KEY);
-            Method of = fluxKeyClass.getMethod("of", energyTypeClass);
-            return of.invoke(null, feType);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
+            type.getMethod(name, parameterTypes);
+            return true;
+        } catch (NoSuchMethodException ex) {
+            return false;
         }
     }
 
-    private static Method[] resolveStorageMethods() {
+    private static int invokeInt(Object target, String methodName, int amount, boolean simulate) {
         try {
-            Class<?> meStorage = Class.forName("ae2.api.storage.MEStorage");
-            Class<?> aeKey = Class.forName("ae2.api.stacks.AEKey");
-            Class<?> actionable = Class.forName("ae2.api.config.Actionable");
-            Class<?> actionSource = Class.forName("ae2.api.networking.security.IActionSource");
-            Method extract = meStorage.getMethod("extract", aeKey, long.class, actionable, actionSource);
-            Method insert = meStorage.getMethod("insert", aeKey, long.class, actionable, actionSource);
-            return new Method[] {extract, insert};
-        } catch (ReflectiveOperationException ignored) {
-            return new Method[] {null, null};
+            Method method = target.getClass().getMethod(methodName, int.class, boolean.class);
+            Object result = method.invoke(target, amount, simulate);
+            if (result instanceof Number number) {
+                return number.intValue();
+            }
+        } catch (ReflectiveOperationException ex) {
+            LOG.warn("Failed to invoke {} on {}: {}", methodName, target.getClass().getName(), ex.getMessage());
+        }
+        return 0;
+    }
+
+    private interface EnergyAccessor {
+        Object get(Object machine) throws ReflectiveOperationException;
+    }
+
+    private static final class FieldAccessor implements EnergyAccessor {
+        private final Field field;
+
+        private FieldAccessor(Field field) {
+            this.field = field;
+        }
+
+        @Override
+        public Object get(Object machine) throws IllegalAccessException {
+            return field.get(machine);
+        }
+    }
+
+    private static final class MethodAccessor implements EnergyAccessor {
+        private final Method method;
+
+        private MethodAccessor(Method method) {
+            this.method = method;
+        }
+
+        @Override
+        public Object get(Object machine) throws InvocationTargetException, IllegalAccessException {
+            return method.invoke(machine);
         }
     }
 }

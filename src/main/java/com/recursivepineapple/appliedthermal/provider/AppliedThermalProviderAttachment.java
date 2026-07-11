@@ -1,212 +1,190 @@
 package com.recursivepineapple.appliedthermal.provider;
 
-import ae2.api.config.Actionable;
-import ae2.api.implementations.blockentities.PatternContainerGroup;
-import ae2.api.networking.GridFlags;
-import ae2.api.networking.GridHelper;
-import ae2.api.networking.IGrid;
-import ae2.api.networking.IGridNode;
-import ae2.api.networking.IGridNodeListener;
-import ae2.api.networking.IInWorldGridNodeHost;
-import ae2.api.networking.IManagedGridNode;
-import ae2.api.networking.crafting.ICraftingProvider;
-import ae2.api.networking.security.IActionHost;
-import ae2.api.networking.security.IActionSource;
-import ae2.api.networking.storage.IStorageService;
-import ae2.api.orientation.BlockOrientation;
-import ae2.api.stacks.AEItemKey;
-import ae2.api.stacks.AEKey;
-import ae2.api.stacks.KeyCounter;
-import ae2.api.storage.MEStorage;
-import ae2.api.storage.StorageHelper;
-import ae2.api.upgrades.IUpgradeInventory;
-import ae2.api.util.AECableType;
-import ae2.helpers.patternprovider.PatternProviderLogic;
-import ae2.helpers.patternprovider.PatternProviderLogicHost;
-import ae2.util.Platform;
-import cofh.core.block.TileReconfigurable;
-import cofh.core.block.TilePowered;
-import cofh.core.util.core.SlotConfig;
-import cofh.core.util.helpers.ItemHelper;
-import cofh.thermalexpansion.block.machine.BlockMachine;
-import cofh.thermalexpansion.block.machine.TileMachineBase;
-import com.recursivepineapple.appliedthermal.integration.appflux.AppFluxCompat;
-import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
+import appeng.api.config.Actionable;
+import appeng.api.implementations.blockentities.PatternContainerGroup;
+import appeng.api.networking.GridFlags;
+import appeng.api.networking.GridHelper;
+import appeng.api.networking.IGrid;
+import appeng.api.networking.IGridNode;
+import appeng.api.networking.IGridNodeListener;
+import appeng.api.networking.IInWorldGridNodeHost;
+import appeng.api.networking.IManagedGridNode;
+import appeng.api.networking.crafting.ICraftingProvider;
+import appeng.api.networking.security.IActionHost;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.networking.storage.IStorageService;
+import appeng.api.storage.MEStorage;
+import appeng.api.storage.StorageHelper;
+import appeng.api.stacks.AEFluidKey;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
+import appeng.api.stacks.KeyCounter;
+import appeng.api.util.AECableType;
+import appeng.helpers.patternprovider.PatternProviderLogic;
+import appeng.helpers.patternprovider.PatternProviderLogicHost;
+import cofh.lib.common.fluid.FluidStorageCoFH;
+import cofh.lib.common.inventory.ItemStorageCoFH;
+import cofh.thermal.lib.common.block.entity.MachineBlockEntity;
+import com.recursivepineapple.appliedthermal.attachment.MachineAttachment;
 import com.recursivepineapple.appliedthermal.init.ATItems;
-import java.lang.reflect.Field;
+import com.recursivepineapple.appliedthermal.menu.AppliedThermalPatternProviderMenu;
+import com.recursivepineapple.appliedthermal.mixin.AugmentableBlockEntityAccessor;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
-import net.minecraft.util.EnumFacing;
-import net.minecraft.util.text.ITextComponent;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.fluids.FluidStack;
 
-public final class AppliedThermalProviderAttachment implements PatternProviderLogicHost, IActionHost,
-    IInWorldGridNodeHost {
+/**
+ * Owns the AE2 node and provider state attached to one Thermal machine.
+ *
+ * <p>The attachment talks to Thermal's explicit input/output storages so it
+ * does not need to infer slot intent from Forge capability validity.</p>
+ */
+public final class AppliedThermalProviderAttachment implements MachineAttachment,
+        PatternProviderLogicHost, IActionHost, IInWorldGridNodeHost {
 
-    private static final String TAG_ROOT = "AppliedThermalProvider";
-    private static final String TAG_RETURN_OUTPUTS = "ReturnOutputsToNetwork";
-    @Nullable
-    private static Field slotConfigField;
-    private static boolean slotConfigFieldResolved;
+    private static final String TAG_ROOT = "AppliedThermalProvider1201";
+    private static final String TAG_ENABLED = "Enabled";
+    private static final String TAG_OUTPUT_RETURN = "OutputReturn";
 
-    private final TileMachineBase tile;
+    private final BlockEntity machine;
     private IManagedGridNode mainNode;
-    private PatternProviderLogic logic;
-    private boolean loaded;
+    private ThermalMachinePatternProviderLogic logic;
     private boolean enabled;
+    private boolean nodeRunning;
+    private boolean outputReturnEnabled = true;
     @Nullable
-    private NBTTagCompound savedProviderState;
-    @Nullable
-    private String customName;
-    private boolean returnOutputsToNetwork = true;
+    private CompoundTag savedState;
 
-    public AppliedThermalProviderAttachment(TileMachineBase tile) {
-        this.tile = tile;
+    public AppliedThermalProviderAttachment(BlockEntity machine) {
+        this.machine = Objects.requireNonNull(machine, "machine");
         rebuildAeState();
     }
 
-    private IManagedGridNode createManagedNode() {
-        return GridHelper.createManagedNode(this.tile, TileListener.INSTANCE)
-            .setFlags(GridFlags.REQUIRE_CHANNEL)
-            .setInWorldNode(true)
-            .setExposedOnSides(EnumSet.allOf(EnumFacing.class))
-            .setVisualRepresentation(new ItemStack(ATItems.getPatternProviderAugment()))
-            .setTagName("appliedthermal");
+    public BlockEntity getMachine() {
+        return machine;
     }
 
-    private PatternProviderLogic createLogic(IManagedGridNode node) {
-        PatternProviderLogicHost host = tile instanceof PatternProviderLogicHost ? (PatternProviderLogicHost) tile : this;
-        return new ThermalMachinePatternProviderLogic(node, host, ATItems.getPatternProviderAugment(), 36, this);
+    @Override
+    public boolean isAugmentInstalled(BlockEntity host) {
+        if (!((Object) host instanceof AugmentableBlockEntityAccessor accessor)) {
+            return false;
+        }
+
+        for (var slot : accessor.appliedthermal$getAugmentSlots()) {
+            ItemStack stack = slot.getItemStack();
+            if (!stack.isEmpty() && stack.is(ATItems.getPatternProviderAugment())) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private void rebuildAeState() {
-        this.mainNode = createManagedNode();
-        this.logic = createLogic(this.mainNode);
-        applySavedProviderState();
+    @Override
+    public boolean isNodeRunning() {
+        return nodeRunning;
     }
 
-    public void setEnabled(boolean enabled) {
-        if (this.enabled == enabled) {
+    @Override
+    public void startNode() {
+        if (nodeRunning) {
             return;
         }
-        this.enabled = enabled;
-        if (enabled) {
-            createNodeIfReady();
-            refreshProviderState();
-        } else {
-            captureProviderState();
-            rebuildAfterDestroy();
+
+        enabled = true;
+        nodeRunning = true;
+        rebuildAeState();
+        applySavedState();
+
+        if (machine.getLevel() != null && !machine.getLevel().isClientSide()) {
+            GridHelper.onFirstTick(machine, ignored -> createNode());
         }
-        saveChanges();
     }
 
-    public boolean isEnabled() {
-        return enabled;
+    @Override
+    public void stopNode() {
+        if (!nodeRunning) {
+            return;
+        }
+
+        closeOpenMenus();
+        captureState();
+        nodeRunning = false;
+        enabled = false;
+        mainNode.destroy();
+        rebuildAeState();
     }
 
-    public void ejectContentsOnAugmentRemoval() {
-        if (!this.enabled || tile.getWorld() == null || tile.getWorld().isRemote) {
+    @Override
+    public void onReady() {
+        if (nodeRunning) {
+            createNode();
+        }
+    }
+
+    @Override
+    public void invalidate() {
+        closeOpenMenus();
+        if (nodeRunning) {
+            captureState();
+            mainNode.destroy();
+        }
+        nodeRunning = false;
+        rebuildAeState();
+    }
+
+    @Override
+    public void readFromNBT(CompoundTag tag) {
+        if (!tag.contains(TAG_ROOT)) {
+            return;
+        }
+
+        CompoundTag providerTag = tag.getCompound(TAG_ROOT);
+        savedState = providerTag.copy();
+        enabled = providerTag.getBoolean(TAG_ENABLED);
+        outputReturnEnabled = !providerTag.contains(TAG_OUTPUT_RETURN)
+                || providerTag.getBoolean(TAG_OUTPUT_RETURN);
+        applySavedState();
+    }
+
+    @Override
+    public void writeToNBT(CompoundTag tag) {
+        if (nodeRunning) {
+            captureState();
+        }
+        if (savedState != null) {
+            tag.put(TAG_ROOT, savedState.copy());
+        }
+    }
+
+    @Override
+    public void ejectAndClear() {
+        closeOpenMenus();
+        if (machine.getLevel() == null || machine.getLevel().isClientSide()) {
+            logic.clearContent();
             return;
         }
 
         List<ItemStack> drops = new ArrayList<>();
-        this.logic.addDrops(drops);
-        for (ItemStack upgrade : this.logic.getUpgrades()) {
-            if (!upgrade.isEmpty()) {
-                drops.add(upgrade.copy());
+        logic.addDrops(drops);
+        logic.clearContent();
+        for (ItemStack drop : drops) {
+            if (!drop.isEmpty()) {
+                Block.popResource(machine.getLevel(), machine.getBlockPos(), drop);
             }
         }
-
-        this.logic.clearContent();
-        captureProviderState();
         saveChanges();
-        Platform.spawnDrops(tile.getWorld(), tile.getPos(), drops);
-    }
-
-    public void onReady() {
-        this.loaded = true;
-        createNodeIfReady();
-        if (enabled) {
-            refreshProviderState();
-        }
-    }
-
-    public void invalidate() {
-        captureProviderState();
-        this.loaded = false;
-        rebuildAfterDestroy();
-    }
-
-    public void readFromNBT(NBTTagCompound nbt) {
-        if (!nbt.hasKey(TAG_ROOT)) {
-            return;
-        }
-        NBTTagCompound tag = nbt.getCompoundTag(TAG_ROOT);
-        this.savedProviderState = tag.copy();
-        applySavedProviderState();
-        if (tag.hasKey("CustomName")) {
-            this.customName = tag.getString("CustomName");
-        }
-        this.returnOutputsToNetwork = !tag.hasKey(TAG_RETURN_OUTPUTS) || tag.getBoolean(TAG_RETURN_OUTPUTS);
-    }
-
-    public void writeToNBT(NBTTagCompound nbt) {
-        captureProviderState();
-        if (this.savedProviderState != null) {
-            nbt.setTag(TAG_ROOT, this.savedProviderState.copy());
-        }
-    }
-
-    private void createNodeIfReady() {
-        if (enabled && loaded && this.mainNode.getNode() == null && tile.hasWorld() && !tile.getWorld().isRemote) {
-            try {
-                this.mainNode.create(tile.getWorld(), tile.getPos());
-            } catch (IllegalStateException e) {
-                captureProviderState();
-                rebuildAfterDestroy();
-                this.mainNode.create(tile.getWorld(), tile.getPos());
-            }
-        }
-        if (enabled && this.mainNode.getNode() != null) {
-            this.mainNode.setVisualRepresentation(getMainContainerIcon());
-        }
-    }
-
-    private void rebuildAfterDestroy() {
-        this.mainNode.destroy();
-        rebuildAeState();
-    }
-
-    private void captureProviderState() {
-        NBTTagCompound tag = new NBTTagCompound();
-        this.logic.writeToNBT(tag);
-        this.mainNode.saveToNBT(tag);
-        if (this.customName != null && !this.customName.isEmpty()) {
-            tag.setString("CustomName", this.customName);
-        }
-        tag.setBoolean(TAG_RETURN_OUTPUTS, this.returnOutputsToNetwork);
-        this.savedProviderState = tag;
-    }
-
-    private void applySavedProviderState() {
-        if (this.savedProviderState == null) {
-            return;
-        }
-        NBTTagCompound tag = this.savedProviderState.copy();
-        this.logic.readFromNBT(tag);
-        this.mainNode.loadFromNBT(tag);
-        if (tag.hasKey("CustomName")) {
-            this.customName = tag.getString("CustomName");
-        }
-        this.returnOutputsToNetwork = !tag.hasKey(TAG_RETURN_OUTPUTS) || tag.getBoolean(TAG_RETURN_OUTPUTS);
-        if (enabled && loaded) {
-            refreshProviderState();
-        }
     }
 
     @Override
@@ -215,275 +193,103 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
     }
 
     @Override
-    public TileEntity getTileEntity() {
-        return tile;
+    public BlockEntity getBlockEntity() {
+        return machine;
     }
 
     @Override
-    public EnumSet<EnumFacing> getTargets() {
-        return EnumSet.allOf(EnumFacing.class);
-    }
-
-    @Override
-    public boolean hasCustomName() {
-        return customName != null && !customName.isEmpty();
-    }
-
-    @Override
-    @Nullable
-    public String getCustomName() {
-        return customName;
-    }
-
-    @Override
-    public void setCustomName(@Nullable String name) {
-        this.customName = name;
-        saveChanges();
+    public EnumSet<Direction> getTargets() {
+        return EnumSet.noneOf(Direction.class);
     }
 
     @Override
     public void saveChanges() {
-        tile.markDirty();
+        machine.setChanged();
     }
 
     @Override
     public AEItemKey getTerminalIcon() {
-        ItemStack stack = tile.getBlockType() instanceof BlockMachine
-            ? new ItemStack(tile.getBlockType(), 1, tile.getBlockMetadata())
-            : new ItemStack(ATItems.getPatternProviderAugment());
-        return AEItemKey.of(stack);
+        AEItemKey icon = AEItemKey.of(new ItemStack(machine.getBlockState().getBlock()));
+        return icon != null ? icon : AEItemKey.of(ATItems.getPatternProviderAugment());
     }
 
     @Override
-    public ItemStack getMainContainerIcon() {
-        if (tile.getBlockType() instanceof BlockMachine) {
-            return new ItemStack(tile.getBlockType(), 1, tile.getBlockMetadata());
-        }
-        return new ItemStack(ATItems.getPatternProviderAugment());
+    public ItemStack getMainMenuIcon() {
+        return getTerminalIcon().toStack();
     }
 
     @Override
     public PatternContainerGroup getTerminalGroup() {
-        AEItemKey icon = getTerminalIcon();
-        ITextComponent name = tile.getDisplayName();
-        return new PatternContainerGroup(icon, name, java.util.Collections.emptyList());
+        return logic.getTerminalGroup();
     }
 
     @Override
-    public IUpgradeInventory getUpgrades() {
-        return this.logic.getUpgrades();
-    }
-
-    @Override
-    @Nullable
-    public IGrid getGrid() {
-        return logic.getGrid();
-    }
-
-    @Override
-    @Nullable
     public IGridNode getActionableNode() {
         return mainNode.getNode();
+    }
+
+    @Override
+    public IGridNode getGridNode(Direction direction) {
+        return enabled && nodeRunning ? mainNode.getNode() : null;
+    }
+
+    @Override
+    public AECableType getCableConnectionType(Direction direction) {
+        return enabled && nodeRunning ? AECableType.SMART : AECableType.NONE;
+    }
+
+    @Nullable
+    public IGrid getGrid() {
+        return mainNode.getGrid();
     }
 
     public IManagedGridNode getMainNode() {
         return mainNode;
     }
 
-    @Override
-    @Nullable
-    public IGridNode getGridNode(EnumFacing dir) {
-        return enabled ? mainNode.getNode() : null;
+    public boolean isEnabled() {
+        return enabled && nodeRunning;
     }
 
-    @Override
-    public AECableType getCableConnectionType(EnumFacing dir) {
-        return enabled ? AECableType.SMART : AECableType.NONE;
+    public boolean isOutputReturnEnabled() {
+        return outputReturnEnabled;
     }
 
-    public long insertInput(AEKey what, long amount, Actionable action) {
-        if (!(what instanceof AEItemKey) || amount <= 0 || amount > Integer.MAX_VALUE) {
-            return 0;
-        }
-        AEItemKey itemKey = (AEItemKey) what;
-        ItemStack stack = itemKey.toStack((int) amount);
-        ItemStack simulated = stack.copy();
-        int inserted = 0;
-        for (int slot = 0; slot < tile.getSizeInventory() && inserted < amount; slot++) {
-            if (!isInputSlot(slot) || !tile.isItemValidForSlot(slot, simulated)) {
-                continue;
-            }
-            ItemStack existing = tile.getStackInSlot(slot);
-            if (existing.isEmpty()) {
-                int move = Math.min(simulated.getCount(), simulated.getMaxStackSize());
-                if (action == Actionable.MODULATE) {
-                    ItemStack copy = simulated.copy();
-                    copy.setCount(move);
-                    tile.setInventorySlotContents(slot, copy);
-                }
-                inserted += move;
-                simulated.shrink(move);
-            } else if (ItemHelper.itemsIdentical(existing, simulated)
-                && existing.getCount() < Math.min(existing.getMaxStackSize(), tile.getInventoryStackLimit())) {
-                int move = Math.min(simulated.getCount(),
-                    Math.min(existing.getMaxStackSize(), tile.getInventoryStackLimit()) - existing.getCount());
-                if (action == Actionable.MODULATE) {
-                    existing.grow(move);
-                    tile.setInventorySlotContents(slot, existing);
-                }
-                inserted += move;
-                simulated.shrink(move);
-            }
-        }
-        if (inserted > 0 && action == Actionable.MODULATE) {
-            tile.markDirty();
-        }
-        return inserted;
-    }
-
-    public boolean shouldReturnOutputsToNetwork() {
-        return returnOutputsToNetwork;
-    }
-
-    public void setReturnOutputsToNetwork(boolean returnOutputsToNetwork) {
-        if (this.returnOutputsToNetwork == returnOutputsToNetwork) {
+    public void setOutputReturnEnabled(boolean outputReturnEnabled) {
+        if (this.outputReturnEnabled == outputReturnEnabled) {
             return;
         }
-        this.returnOutputsToNetwork = returnOutputsToNetwork;
+        this.outputReturnEnabled = outputReturnEnabled;
         saveChanges();
     }
 
-    public void tryReturnOutputsToNetwork() {
-        if (!enabled || !returnOutputsToNetwork || tile.getWorld() == null || tile.getWorld().isRemote) {
-            return;
-        }
-        IGrid grid = getGrid();
-        IGridNode node = getActionableNode();
-        if (grid == null || node == null || !node.isActive()) {
-            return;
-        }
-        IStorageService storageService = grid.getStorageService();
-        if (storageService == null) {
-            return;
-        }
-        MEStorage storage = storageService.getInventory();
-        IActionSource source = IActionSource.ofMachine(this);
-        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
-            if (!isOutputSlot(slot)) {
-                continue;
-            }
-            ItemStack stack = tile.getStackInSlot(slot);
-            if (stack.isEmpty()) {
-                continue;
-            }
-            AEItemKey key = AEItemKey.of(stack);
-            long requested = stack.getCount();
-            long accepted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, requested, source,
-                Actionable.SIMULATE);
-            if (accepted <= 0) {
-                continue;
-            }
-            long inserted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, accepted, source,
-                Actionable.MODULATE);
-            if (inserted <= 0) {
-                continue;
-            }
-            ItemStack remaining = stack.copy();
-            remaining.shrink((int) Math.min(inserted, Integer.MAX_VALUE));
-            tile.setInventorySlotContents(slot, remaining.isEmpty() ? ItemStack.EMPTY : remaining);
-            tile.markDirty();
-        }
-    }
-
-    public void tryChargeMachineFromFluxNetwork() {
-        if (!enabled || tile.getWorld() == null || tile.getWorld().isRemote || !(tile instanceof TilePowered)
-            || !(tile instanceof AppliedThermalMachine)) {
-            return;
-        }
-        AppliedThermalMachine machine = (AppliedThermalMachine) tile;
-        if (!machine.appliedthermal$getFluxAttachment().isInductionCardInstalled()) {
-            return;
-        }
-        TilePowered powered = (TilePowered) tile;
-        int energySpace = powered.getMaxEnergyStored(null) - powered.getEnergyStored(null);
-        if (energySpace <= 0) {
-            return;
-        }
-        long extracted = AppFluxCompat.bridge().extractEnergyFromGrid(machine, energySpace, false);
-        if (extracted <= 0) {
-            return;
-        }
-        powered.receiveEnergy(null, clampToInt(extracted), false);
-        tile.markDirty();
-    }
-
-    private boolean isOutputSlot(int slot) {
-        SlotConfig slotConfig = getSlotConfig(tile);
-        return slotConfig != null
-            && slotConfig.allowExtractionSlot != null
-            && slot >= 0
-            && slot < slotConfig.allowExtractionSlot.length
-            && slotConfig.allowExtractionSlot[slot];
-    }
-
-    private boolean isInputSlot(int slot) {
-        SlotConfig slotConfig = getSlotConfig(tile);
-        return slotConfig != null
-            && slotConfig.allowInsertionSlot != null
-            && slot >= 0
-            && slot < slotConfig.allowInsertionSlot.length
-            && slotConfig.allowInsertionSlot[slot];
-    }
-
-    @Nullable
-    private static SlotConfig getSlotConfig(TileMachineBase tile) {
-        try {
-            Field field = getSlotConfigField();
-            return field == null ? null : (SlotConfig) field.get(tile);
-        } catch (IllegalAccessException ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    private static Field getSlotConfigField() {
-        if (!slotConfigFieldResolved) {
-            slotConfigFieldResolved = true;
-            try {
-                slotConfigField = TileReconfigurable.class.getDeclaredField("slotConfig");
-                slotConfigField.setAccessible(true);
-            } catch (NoSuchFieldException ignored) {
-                slotConfigField = null;
+    public boolean hasOutputItems() {
+        for (ItemStorageCoFH storage : getOutputItemStorages()) {
+            if (!storage.isEmpty()) {
+                return true;
             }
         }
-        return slotConfigField;
+        return false;
     }
 
-    public boolean canAcceptInputs(KeyCounter[] inputs) {
-        for (KeyCounter counter : inputs) {
-            for (Object2LongMap.Entry<AEKey> input : counter) {
-                if (insertInput(input.getKey(), input.getLongValue(), Actionable.SIMULATE) < input.getLongValue()) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    public boolean acceptsAny(KeyCounter[] inputs) {
-        for (KeyCounter counter : inputs) {
-            for (Object2LongMap.Entry<AEKey> ignored : counter) {
-                if (ignored.getLongValue() > 0) {
-                    return true;
-                }
+    public boolean hasOutputFluids() {
+        for (FluidStorageCoFH storage : getOutputFluidStorages()) {
+            if (!storage.isEmpty()) {
+                return true;
             }
         }
         return false;
     }
 
     public boolean containsAnyInput() {
-        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
-            if (isInputSlot(slot) && !tile.getStackInSlot(slot).isEmpty()) {
+        for (ItemStorageCoFH storage : getInputItemStorages()) {
+            if (!storage.isEmpty()) {
+                return true;
+            }
+        }
+
+        for (FluidStorageCoFH storage : getInputFluidStorages()) {
+            if (!storage.isEmpty()) {
                 return true;
             }
         }
@@ -491,42 +297,639 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
     }
 
     public boolean containsInput(AEKey key) {
-        if (!(key instanceof AEItemKey)) {
+        if (key instanceof AEItemKey itemKey) {
+            for (ItemStorageCoFH storage : getInputItemStorages()) {
+                ItemStack stack = storage.getItemStack();
+                if (!stack.isEmpty() && itemKey.matches(stack)) {
+                    return true;
+                }
+            }
             return false;
         }
-        AEItemKey itemKey = (AEItemKey) key;
-        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
-            if (isInputSlot(slot) && itemKey.matches(tile.getStackInSlot(slot))) {
-                return true;
+
+        if (key instanceof AEFluidKey fluidKey) {
+            for (FluidStorageCoFH storage : getInputFluidStorages()) {
+                FluidStack stack = storage.getFluidStack();
+                if (!stack.isEmpty() && fluidKey.matches(stack)) {
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    private static int clampToInt(long value) {
-        return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(0, (int) value);
+    /**
+     * Simulates all selected inputs against virtual item slots and fluid tanks,
+     * then commits them only if the complete set fits.
+     */
+    public boolean commitInputs(KeyCounter[] inputHolder) {
+        List<InputRequest> requests;
+        try {
+            requests = collectInputs(inputHolder);
+        } catch (ArithmeticException ex) {
+            return false;
+        }
+        if (requests.isEmpty() || !simulateInputs(requests)) {
+            return false;
+        }
+
+        List<? extends ItemStorageCoFH> itemStorages = getInputItemStorages();
+        List<? extends FluidStorageCoFH> fluidStorages = getInputFluidStorages();
+        ItemStack[] itemSnapshots = copyItemStorages(itemStorages);
+        FluidStack[] fluidSnapshots = copyFluidStorages(fluidStorages);
+
+        for (InputRequest request : requests) {
+            if (insertInput(request.key(), request.amount(), Actionable.MODULATE) != request.amount()) {
+                restoreInputStorages(itemStorages, itemSnapshots, fluidStorages, fluidSnapshots);
+                return false;
+            }
+        }
+        return true;
     }
 
-    private void refreshProviderState() {
-        this.logic.updatePatterns();
-        ICraftingProvider.requestUpdate(this.mainNode);
+    public long insertInput(AEKey key, long amount, Actionable action) {
+        if (amount <= 0) {
+            return 0;
+        }
+
+        if (key instanceof AEItemKey itemKey) {
+            List<? extends ItemStorageCoFH> storages = getInputItemStorages();
+            if (storages.isEmpty()) {
+                return 0;
+            }
+
+            long inserted = 0;
+            long remaining = amount;
+            ItemStack sample = itemKey.toStack(1);
+            while (remaining > 0) {
+                int request = (int) Math.min(remaining, Integer.MAX_VALUE);
+                ItemStack pending = itemKey.toStack(request);
+                long movedThisRound = 0;
+                for (ItemStorageCoFH storage : storages) {
+                    if (pending.isEmpty()) {
+                        break;
+                    }
+                    ItemStack current = storage.getItemStack();
+                    if (!current.isEmpty() && itemKey.matches(current) && storage.isItemValid(0, sample)) {
+                        ItemStack remainder = storage.insertItem(0, pending, action == Actionable.SIMULATE);
+                        int moved = pending.getCount() - remainder.getCount();
+                        if (moved > 0) {
+                            inserted += moved;
+                            movedThisRound += moved;
+                            pending = remainder;
+                        }
+                    }
+                }
+                for (ItemStorageCoFH storage : storages) {
+                    if (pending.isEmpty()) {
+                        break;
+                    }
+                    if (!storage.getItemStack().isEmpty() || !storage.isItemValid(0, sample)) {
+                        continue;
+                    }
+                    ItemStack remainder = storage.insertItem(0, pending, action == Actionable.SIMULATE);
+                    int moved = pending.getCount() - remainder.getCount();
+                    if (moved > 0) {
+                        inserted += moved;
+                        movedThisRound += moved;
+                        pending = remainder;
+                    }
+                }
+                if (movedThisRound == 0) {
+                    break;
+                }
+                remaining -= movedThisRound;
+            }
+            return inserted;
+        }
+
+        if (key instanceof AEFluidKey fluidKey) {
+            List<? extends FluidStorageCoFH> storages = getInputFluidStorages();
+            if (storages.isEmpty()) {
+                return 0;
+            }
+
+            long inserted = 0;
+            long remaining = amount;
+            while (remaining > 0) {
+                int request = (int) Math.min(remaining, Integer.MAX_VALUE);
+                FluidStack pending = fluidKey.toStack(request);
+                long movedThisRound = 0;
+                for (FluidStorageCoFH storage : storages) {
+                    if (pending.isEmpty()) {
+                        break;
+                    }
+                    FluidStack current = storage.getFluidStack();
+                    if (!current.isEmpty() && fluidKey.matches(current)) {
+                        int moved = storage.fill(pending,
+                                action == Actionable.SIMULATE
+                                        ? net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.SIMULATE
+                                        : net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+                        if (moved > 0) {
+                            inserted += moved;
+                            movedThisRound += moved;
+                            pending.setAmount(pending.getAmount() - moved);
+                        }
+                    }
+                }
+                for (FluidStorageCoFH storage : storages) {
+                    if (pending.isEmpty()) {
+                        break;
+                    }
+                    if (!storage.getFluidStack().isEmpty() || !storage.isFluidValid(pending)) {
+                        continue;
+                    }
+                    int moved = storage.fill(pending,
+                            action == Actionable.SIMULATE
+                                    ? net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.SIMULATE
+                                    : net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+                    if (moved > 0) {
+                        inserted += moved;
+                        movedThisRound += moved;
+                        pending.setAmount(pending.getAmount() - moved);
+                    }
+                }
+                if (movedThisRound == 0) {
+                    break;
+                }
+                remaining -= movedThisRound;
+            }
+            return inserted;
+        }
+
+        return 0;
     }
 
-    private static AppliedThermalProviderAttachment getAttachment(TileMachineBase tile) {
-        return ((AppliedThermalMachine) tile).appliedthermal$getProviderAttachment();
+    /**
+     * Attempts to return item and fluid output stacks to the connected ME
+     * inventory. The operation is intentionally simulate-then-modulate.
+     */
+    public boolean tryReturnOutputsToNetwork() {
+        if (!outputReturnEnabled) {
+            return false;
+        }
+        IGrid grid = getGrid();
+        IGridNode node = getActionableNode();
+        if (!isEnabled() || grid == null || node == null || !node.isActive()) {
+            return false;
+        }
+
+        IStorageService storageService = grid.getStorageService();
+        if (storageService == null) {
+            return false;
+        }
+
+        MEStorage storage = storageService.getInventory();
+        IActionSource source = IActionSource.ofMachine(this);
+        boolean changed = tryReturnItemOutputs(grid, storage, source);
+        changed |= tryReturnFluidOutputs(grid, storage, source);
+        if (changed) {
+            saveChanges();
+        }
+        return changed;
     }
 
-    private enum TileListener implements IGridNodeListener<TileMachineBase> {
+    @Override
+    public void tickServer() {
+        tryReturnOutputsToNetwork();
+    }
+
+    public void refreshProviderState() {
+        logic.updatePatterns();
+        ICraftingProvider.requestUpdate(mainNode);
+    }
+
+    public void onMainNodeStateChanged() {
+        logic.onMainNodeStateChanged();
+    }
+
+    private void rebuildAeState() {
+        mainNode = GridHelper.createManagedNode(this, NodeListener.INSTANCE)
+                .setFlags(GridFlags.REQUIRE_CHANNEL)
+                .setInWorldNode(true)
+                .setExposedOnSides(EnumSet.allOf(Direction.class))
+                .setVisualRepresentation(ATItems.getPatternProviderAugment())
+                .setTagName("appliedthermal");
+        logic = new ThermalMachinePatternProviderLogic(mainNode, this);
+    }
+
+    private void closeOpenMenus() {
+        if (!(machine.getLevel() instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        for (var player : serverLevel.players()) {
+            if (player.containerMenu instanceof AppliedThermalPatternProviderMenu menu
+                    && menu.isFor(this)) {
+                player.closeContainer();
+            }
+        }
+    }
+
+    private void createNode() {
+        if (!nodeRunning || machine.getLevel() == null || machine.getLevel().isClientSide()
+                || mainNode.isReady()) {
+            return;
+        }
+        mainNode.create(machine.getLevel(), machine.getBlockPos());
+        mainNode.setVisualRepresentation(getTerminalIcon());
+        refreshProviderState();
+    }
+
+    private void captureState() {
+        CompoundTag tag = new CompoundTag();
+        logic.writeToNBT(tag);
+        mainNode.saveToNBT(tag);
+        tag.putBoolean(TAG_ENABLED, enabled);
+        tag.putBoolean(TAG_OUTPUT_RETURN, outputReturnEnabled);
+        savedState = tag;
+    }
+
+    private void applySavedState() {
+        if (savedState == null) {
+            return;
+        }
+        CompoundTag tag = savedState.copy();
+        logic.readFromNBT(tag);
+        mainNode.loadFromNBT(tag);
+        enabled = tag.getBoolean(TAG_ENABLED);
+        outputReturnEnabled = !tag.contains(TAG_OUTPUT_RETURN)
+                || tag.getBoolean(TAG_OUTPUT_RETURN);
+        refreshProviderState();
+    }
+
+    private void notifyStackReturnedToNetwork(AEKey key, long amount) {
+        if (amount <= 0) {
+            return;
+        }
+        logic.notifyStackReturnedToNetwork(new GenericStack(key, amount));
+    }
+
+    @Nullable
+    private MachineBlockEntity getThermalMachine() {
+        return machine instanceof MachineBlockEntity thermalMachine ? thermalMachine : null;
+    }
+
+    private List<? extends ItemStorageCoFH> getInputItemStorages() {
+        MachineBlockEntity thermalMachine = getThermalMachine();
+        return thermalMachine != null ? thermalMachine.inputSlots() : List.<ItemStorageCoFH>of();
+    }
+
+    private List<? extends FluidStorageCoFH> getInputFluidStorages() {
+        MachineBlockEntity thermalMachine = getThermalMachine();
+        return thermalMachine != null ? thermalMachine.inputTanks() : List.<FluidStorageCoFH>of();
+    }
+
+    private List<? extends ItemStorageCoFH> getOutputItemStorages() {
+        if ((Object) machine instanceof AugmentableBlockEntityAccessor accessor) {
+            return accessor.appliedthermal$getMachineInventory().getOutputSlots();
+        }
+        return List.of();
+    }
+
+    private List<? extends FluidStorageCoFH> getOutputFluidStorages() {
+        if ((Object) machine instanceof AugmentableBlockEntityAccessor accessor) {
+            return accessor.appliedthermal$getMachineTankInventory().getOutputTanks();
+        }
+        return List.of();
+    }
+
+    private void restoreItemOutput(ItemStorageCoFH storage, ItemStack extracted, long inserted) {
+        long shortfall = extracted.getCount() - inserted;
+        if (shortfall <= 0) {
+            return;
+        }
+
+        ItemStack current = storage.getItemStack();
+        if (current.isEmpty()) {
+            ItemStack restored = extracted.copy();
+            restored.setCount((int) Math.min(shortfall, Integer.MAX_VALUE));
+            storage.setItemStack(restored);
+        } else {
+            current.grow((int) Math.min(shortfall, Integer.MAX_VALUE));
+        }
+    }
+
+    private void restoreFluidOutput(FluidStorageCoFH storage, FluidStack drained, long inserted) {
+        long shortfall = drained.getAmount() - inserted;
+        if (shortfall <= 0) {
+            return;
+        }
+
+        FluidStack current = storage.getFluidStack();
+        if (current.isEmpty()) {
+            FluidStack restored = drained.copy();
+            restored.setAmount((int) Math.min(shortfall, Integer.MAX_VALUE));
+            storage.setFluidStack(restored);
+        } else {
+            current.grow((int) Math.min(shortfall, Integer.MAX_VALUE));
+        }
+    }
+
+    private boolean simulateInputs(List<InputRequest> requests) {
+        ItemSimulation itemSimulation = null;
+        FluidSimulation fluidSimulation = null;
+        List<? extends ItemStorageCoFH> inputItems = getInputItemStorages();
+        List<? extends FluidStorageCoFH> inputFluids = getInputFluidStorages();
+
+        for (InputRequest request : requests) {
+            if (request.key() instanceof AEItemKey itemKey) {
+                if (itemSimulation == null) {
+                    if (inputItems.isEmpty()) {
+                        return false;
+                    }
+                    itemSimulation = new ItemSimulation(inputItems);
+                }
+                if (!itemSimulation.insert(itemKey, request.amount())) {
+                    return false;
+                }
+            } else if (request.key() instanceof AEFluidKey fluidKey) {
+                if (fluidSimulation == null) {
+                    if (inputFluids.isEmpty()) {
+                        return false;
+                    }
+                    fluidSimulation = new FluidSimulation(inputFluids);
+                }
+                if (!fluidSimulation.insert(fluidKey, request.amount())) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<InputRequest> collectInputs(KeyCounter[] inputHolder) {
+        Map<AEKey, Long> amounts = new LinkedHashMap<>();
+        for (KeyCounter counter : inputHolder) {
+            for (var entry : counter) {
+                if (entry.getLongValue() <= 0) {
+                    continue;
+                }
+                amounts.merge(entry.getKey(), entry.getLongValue(), AppliedThermalProviderAttachment::addExact);
+            }
+        }
+
+        List<InputRequest> requests = new ArrayList<>(amounts.size());
+        for (var entry : amounts.entrySet()) {
+            requests.add(new InputRequest(entry.getKey(), entry.getValue()));
+        }
+        return requests;
+    }
+
+    private static long addExact(long left, long right) {
+        return Math.addExact(left, right);
+    }
+
+    private static ItemStack[] copyItemStorages(List<? extends ItemStorageCoFH> storages) {
+        ItemStack[] snapshots = new ItemStack[storages.size()];
+        for (int slot = 0; slot < snapshots.length; slot++) {
+            snapshots[slot] = storages.get(slot).getItemStack().copy();
+        }
+        return snapshots;
+    }
+
+    private static FluidStack[] copyFluidStorages(List<? extends FluidStorageCoFH> storages) {
+        FluidStack[] snapshots = new FluidStack[storages.size()];
+        for (int tank = 0; tank < snapshots.length; tank++) {
+            snapshots[tank] = storages.get(tank).getFluidStack().copy();
+        }
+        return snapshots;
+    }
+
+    private void restoreInputStorages(List<? extends ItemStorageCoFH> itemStorages,
+            ItemStack[] itemSnapshots,
+            List<? extends FluidStorageCoFH> fluidStorages,
+            FluidStack[] fluidSnapshots) {
+        for (int slot = 0; slot < itemSnapshots.length; slot++) {
+            itemStorages.get(slot).setItemStack(itemSnapshots[slot].copy());
+        }
+        for (int tank = 0; tank < fluidSnapshots.length; tank++) {
+            fluidStorages.get(tank).setFluidStack(fluidSnapshots[tank].copy());
+        }
+        saveChanges();
+    }
+
+    private boolean tryReturnItemOutputs(IGrid grid, MEStorage storage, IActionSource source) {
+        List<? extends ItemStorageCoFH> outputs = getOutputItemStorages();
+        if (outputs.isEmpty()) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (int slot = 0; slot < outputs.size(); slot++) {
+            ItemStorageCoFH output = outputs.get(slot);
+            ItemStack stack = output.getItemStack();
+            if (stack.isEmpty()) {
+                continue;
+            }
+
+            ItemStack simulated = output.extractItem(0, stack.getCount(), true);
+            if (simulated.isEmpty()) {
+                continue;
+            }
+
+            AEItemKey key = AEItemKey.of(simulated);
+            if (key == null) {
+                continue;
+            }
+            long accepted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, simulated.getCount(), source,
+                    Actionable.SIMULATE);
+            if (accepted <= 0) {
+                continue;
+            }
+
+            ItemStack extracted = output.extractItem(0, (int) Math.min(accepted, Integer.MAX_VALUE), false);
+            if (extracted.isEmpty()) {
+                continue;
+            }
+
+            long inserted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, extracted.getCount(), source,
+                    Actionable.MODULATE);
+            if (inserted <= 0) {
+                restoreItemOutput(output, extracted, 0);
+                continue;
+            }
+
+            if (inserted < extracted.getCount()) {
+                restoreItemOutput(output, extracted, inserted);
+            }
+
+            notifyStackReturnedToNetwork(key, inserted);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private boolean tryReturnFluidOutputs(IGrid grid, MEStorage storage, IActionSource source) {
+        List<? extends FluidStorageCoFH> outputs = getOutputFluidStorages();
+        if (outputs.isEmpty()) {
+            return false;
+        }
+
+        boolean changed = false;
+        for (int tank = 0; tank < outputs.size(); tank++) {
+            FluidStorageCoFH output = outputs.get(tank);
+            FluidStack stack = output.getFluidStack();
+            if (stack.isEmpty()) {
+                continue;
+            }
+
+            FluidStack simulated = output.drain(stack.getAmount(),
+                    net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.SIMULATE);
+            if (simulated.isEmpty()) {
+                continue;
+            }
+
+            AEFluidKey key = AEFluidKey.of(simulated);
+            if (key == null) {
+                continue;
+            }
+
+            long amount = simulated.getAmount();
+            long accepted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, amount, source,
+                    Actionable.SIMULATE);
+            if (accepted <= 0) {
+                continue;
+            }
+
+            FluidStack drained = output.drain((int) Math.min(accepted, Integer.MAX_VALUE),
+                    net.minecraftforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+            if (drained.isEmpty()) {
+                continue;
+            }
+
+            long inserted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, drained.getAmount(), source,
+                    Actionable.MODULATE);
+            if (inserted <= 0) {
+                restoreFluidOutput(output, drained, 0);
+                continue;
+            }
+
+            if (inserted < drained.getAmount()) {
+                restoreFluidOutput(output, drained, inserted);
+            }
+
+            notifyStackReturnedToNetwork(key, inserted);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private record InputRequest(AEKey key, long amount) {
+    }
+
+    private static final class ItemSimulation {
+        private final List<? extends ItemStorageCoFH> storages;
+        private final ItemStack[] slots;
+
+        private ItemSimulation(List<? extends ItemStorageCoFH> storages) {
+            this.storages = storages;
+            this.slots = new ItemStack[storages.size()];
+            for (int slot = 0; slot < slots.length; slot++) {
+                slots[slot] = storages.get(slot).getItemStack().copy();
+            }
+        }
+
+        private boolean insert(AEItemKey key, long amount) {
+            if (amount <= 0) {
+                return true;
+            }
+
+            ItemStack sample = key.toStack(1);
+            long remaining = amount;
+            for (int slot = 0; slot < slots.length && remaining > 0; slot++) {
+                ItemStack current = slots[slot];
+                ItemStorageCoFH storage = storages.get(slot);
+                if (!current.isEmpty() && key.matches(current)
+                        && storage.isItemValid(0, sample)) {
+                    int capacity = Math.min(storage.getSlotLimit(0), current.getMaxStackSize())
+                            - current.getCount();
+                    int moved = (int) Math.min(Math.max(capacity, 0), remaining);
+                    if (moved > 0) {
+                        current.grow(moved);
+                        remaining -= moved;
+                    }
+                }
+            }
+
+            for (int slot = 0; slot < slots.length && remaining > 0; slot++) {
+                ItemStorageCoFH storage = storages.get(slot);
+                if (!slots[slot].isEmpty() || !storage.isItemValid(0, sample)) {
+                    continue;
+                }
+                int limit = Math.min(storage.getSlotLimit(0), sample.getMaxStackSize());
+                int moved = (int) Math.min(Math.max(limit, 0), remaining);
+                if (moved > 0) {
+                    slots[slot] = sample.copy();
+                    slots[slot].setCount(moved);
+                    remaining -= moved;
+                }
+            }
+            return remaining == 0;
+        }
+    }
+
+    private static final class FluidSimulation {
+        private final List<? extends FluidStorageCoFH> storages;
+        private final FluidStack[] tanks;
+
+        private FluidSimulation(List<? extends FluidStorageCoFH> storages) {
+            this.storages = storages;
+            this.tanks = new FluidStack[storages.size()];
+            for (int tank = 0; tank < tanks.length; tank++) {
+                tanks[tank] = storages.get(tank).getFluidStack().copy();
+            }
+        }
+
+        private boolean insert(AEFluidKey key, long amount) {
+            if (amount <= 0) {
+                return true;
+            }
+
+            FluidStack sample = key.toStack(1);
+            long remaining = amount;
+            for (int tank = 0; tank < tanks.length && remaining > 0; tank++) {
+                FluidStack current = tanks[tank];
+                FluidStorageCoFH storage = storages.get(tank);
+                if (!current.isEmpty() && key.matches(current)) {
+                    int capacity = storage.getTankCapacity(0) - current.getAmount();
+                    int moved = (int) Math.min(Math.max(capacity, 0), remaining);
+                    if (moved > 0) {
+                        current.grow(moved);
+                        remaining -= moved;
+                    }
+                }
+            }
+
+            for (int tank = 0; tank < tanks.length && remaining > 0; tank++) {
+                FluidStorageCoFH storage = storages.get(tank);
+                if (!tanks[tank].isEmpty() || !storage.isFluidValid(sample)) {
+                    continue;
+                }
+                int moved = (int) Math.min(Math.max(storage.getTankCapacity(0), 0), remaining);
+                if (moved > 0) {
+                    tanks[tank] = sample.copy();
+                    tanks[tank].setAmount(moved);
+                    remaining -= moved;
+                }
+            }
+            return remaining == 0;
+        }
+    }
+
+    private enum NodeListener implements IGridNodeListener<AppliedThermalProviderAttachment> {
         INSTANCE;
 
         @Override
-        public void onSaveChanges(TileMachineBase nodeOwner, IGridNode node) {
-            getAttachment(nodeOwner).saveChanges();
+        public void onSaveChanges(AppliedThermalProviderAttachment owner, IGridNode node) {
+            owner.saveChanges();
         }
 
         @Override
-        public void onStateChanged(TileMachineBase nodeOwner, IGridNode node, State reason) {
-            getAttachment(nodeOwner).logic.onMainNodeStateChanged();
+        public void onStateChanged(AppliedThermalProviderAttachment owner, IGridNode node,
+                IGridNodeListener.State reason) {
+            owner.onMainNodeStateChanged();
         }
     }
 }

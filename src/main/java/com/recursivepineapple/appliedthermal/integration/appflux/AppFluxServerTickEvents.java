@@ -1,0 +1,23 @@
+package com.recursivepineapple.appliedthermal.integration.appflux;
+
+import com.recursivepineapple.appliedthermal.AppliedThermal;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+
+@Mod.EventBusSubscriber(modid = AppliedThermal.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+public final class AppFluxServerTickEvents {
+
+    private AppFluxServerTickEvents() {
+    }
+
+    @SubscribeEvent
+    public static void onLevelTick(TickEvent.LevelTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || !(event.level instanceof ServerLevel level)) {
+            return;
+        }
+
+        AppFluxCompat.tick(level);
+    }
+}
