@@ -141,13 +141,21 @@ processResources {
     inputs.property("mod_name", mod_name)
     inputs.property("mod_version", mod_version)
     inputs.property("mod_description", mod_description)
+    inputs.property("mod_url", mod_url)
+    inputs.property("mod_update_url", mod_update_url)
+    inputs.property("mod_authors", mod_authors)
+    inputs.property("mod_credits", mod_credits)
 
     filesMatching(["mcmod.info", "pack.mcmeta"]) {
         expand(
             mod_id: mod_id,
             mod_name: mod_name,
             mod_version: mod_version,
-            mod_description: mod_description
+            mod_description: mod_description,
+            mod_url: mod_url,
+            mod_update_url: mod_update_url,
+            mod_authors: mod_authors,
+            mod_credits: mod_credits
         )
     }
 }

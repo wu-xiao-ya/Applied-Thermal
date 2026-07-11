@@ -21,7 +21,7 @@ import org.apache.logging.log4j.Logger;
 public final class AppliedThermal {
 
     public static final String MOD_ID = "appliedthermal";
-    public static final String MOD_NAME = "Applied Thermal";
+    public static final String MOD_NAME = "Applied Thermal | 应用热力";
     public static final String VERSION = "0.1.0";
     public static final String DEPENDENCIES =
         "required-after:ae2;required-after:thermalexpansion;required-after:cofhcore;required-after:thermalfoundation;"
