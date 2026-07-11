@@ -1,7 +1,13 @@
 package com.recursivepineapple.appliedthermal.client;
 
+import ae2.api.client.PatternProviderGuiInitEvent;
 import com.recursivepineapple.appliedthermal.AppliedThermal;
+import com.recursivepineapple.appliedthermal.client.gui.GuiOutputReturnButton;
 import com.recursivepineapple.appliedthermal.init.ATItems;
+import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
+import com.recursivepineapple.appliedthermal.network.ATNetwork;
+import com.recursivepineapple.appliedthermal.network.MessageToggleOutputReturn;
+import com.recursivepineapple.appliedthermal.provider.AppliedThermalProviderAttachment;
 import net.minecraft.client.renderer.block.model.ModelResourceLocation;
 import net.minecraftforge.client.event.ModelRegistryEvent;
 import net.minecraftforge.client.model.ModelLoader;
@@ -23,5 +29,25 @@ public final class ATClientEvents {
             ATItems.getPatternProviderAugment(),
             0,
             new ModelResourceLocation(ATItems.getPatternProviderAugment().getRegistryName(), "inventory"));
+    }
+
+    @SubscribeEvent
+    public static void initializePatternProviderGui(PatternProviderGuiInitEvent event) {
+        if (!(event.getHost() instanceof AppliedThermalMachine)) {
+            return;
+        }
+
+        AppliedThermalProviderAttachment attachment =
+            ((AppliedThermalMachine) event.getHost()).appliedthermal$getProviderAttachment();
+        event.addToLeftToolbar(new GuiOutputReturnButton(
+            attachment::shouldReturnOutputsToNetwork,
+            () -> toggleOutputReturn(attachment)));
+    }
+
+    private static void toggleOutputReturn(AppliedThermalProviderAttachment attachment) {
+        boolean next = !attachment.shouldReturnOutputsToNetwork();
+        attachment.setReturnOutputsToNetwork(next);
+        ATNetwork.CHANNEL.sendToServer(new MessageToggleOutputReturn(
+            attachment.getTileEntity().getPos(), next));
     }
 }

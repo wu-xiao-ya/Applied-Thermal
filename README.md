@@ -4,6 +4,8 @@ Applied Thermal is a Cleanroom/Forge 1.12.2 addon for Applied Energistics 2 - Su
 
 It adds a Thermal machine augment that turns Thermal Expansion machines into AE2S pattern-provider hosts. The scope is intentionally limited to `TileMachineBase` machines; dynamos, devices, storage blocks, cells, and portable containers are not supported.
 
+The current AE2S branch requires AE2S `1.0.9+278077b98` or newer. This is the first build that exposes the pattern-provider toolbar initialization event used by Applied Thermal.
+
 ## Branches
 
 Each supported Minecraft and AE implementation is maintained on its own long-lived branch. Code from different implementations must not be placed on the same branch.

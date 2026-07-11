@@ -67,6 +67,19 @@ repositories {
             includeGroupByRegex("com\\.github\\..*")
         }
     }
+    ivy {
+        name = "AE2SDevRelease"
+        url = uri("https://github.com/FormlessDragon/Applied-Energistics-2-Supergiant/releases/download/dev")
+        patternLayout {
+            artifact("[artifact]-[revision](-[classifier]).[ext]")
+        }
+        metadataSources {
+            artifact()
+        }
+        content {
+            includeGroup("dev.ae2s")
+        }
+    }
     maven {
         name = "FirstDarkDev"
         url = "https://maven.firstdarkdev.xyz/releases/"
@@ -114,7 +127,7 @@ dependencies {
     compileOnly "com.cleanroommc:sponge-mixin:0.20.12+mixin.0.8.7"
     compileOnly "zone.rong:mixinbooter:10.7"
 
-    modCompileOnly "com.github.FormlessDragon:Applied-Energistics-2-Supergiant:v1.0.9:dev"
+    modCompileOnly "dev.ae2s:AppliedEnergistics2-Supergiant:1.0.9+278077b98:dev@jar"
     modCompileOnly "curse.maven:CoFHCore-69162:2920433"
     modCompileOnly "curse.maven:ThermalFoundation-222880:2926428"
     modCompileOnly "curse.maven:ThermalExpansion-69163:2926431"

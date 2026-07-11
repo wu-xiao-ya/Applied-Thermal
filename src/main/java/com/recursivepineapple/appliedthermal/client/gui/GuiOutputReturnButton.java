@@ -4,6 +4,7 @@ import ae2.client.gui.Icon;
 import ae2.client.gui.widgets.IconButton;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
@@ -15,20 +16,17 @@ public final class GuiOutputReturnButton extends IconButton {
     private static final ItemStack PISTON = new ItemStack(Blocks.PISTON);
     private static final int DISABLED_COLOR = 0xFFE33B32;
 
+    private final BooleanSupplier state;
     private final Runnable onToggle;
-    private boolean active;
 
-    public GuiOutputReturnButton(Runnable onToggle) {
+    public GuiOutputReturnButton(BooleanSupplier state, Runnable onToggle) {
         super(null);
+        this.state = state;
         this.onToggle = onToggle;
     }
 
-    public void setState(boolean active) {
-        this.active = active;
-    }
-
     public boolean getState() {
-        return active;
+        return state.getAsBoolean();
     }
 
     @Override
@@ -44,7 +42,7 @@ public final class GuiOutputReturnButton extends IconButton {
     @Override
     public void drawButton(Minecraft minecraft, int mouseX, int mouseY, float partialTicks) {
         super.drawButton(minecraft, mouseX, mouseY, partialTicks);
-        if (!visible || active) {
+        if (!visible || getState()) {
             return;
         }
         int top = y + (hovered ? 1 : 0);
@@ -68,7 +66,7 @@ public final class GuiOutputReturnButton extends IconButton {
     public List<ITextComponent> getTooltipMessage() {
         return Arrays.asList(
             new TextComponentTranslation("gui.appliedthermal.output_return"),
-            new TextComponentTranslation(active
+            new TextComponentTranslation(getState()
                 ? "gui.appliedthermal.output_return.on"
                 : "gui.appliedthermal.output_return.off"),
             new TextComponentTranslation("gui.appliedthermal.output_return.desc"));
