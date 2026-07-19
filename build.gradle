@@ -10,6 +10,9 @@ def enableFluxAppliedRuntime = providers.gradleProperty("withFluxApplied")
     .map { it.toBoolean() }
     .orElse(false)
     .get()
+def mixinBooterVersion = providers.gradleProperty("mixinbooter_version")
+    .orElse("10.0")
+    .get()
 
 def verifiedRemoteFile = { String fileName, String url, String expectedSha256 ->
     File cacheDir = new File(gradle.gradleUserHomeDir, "caches/appliedthermal")
@@ -173,7 +176,7 @@ unimined.minecraft {
 
 dependencies {
     compileOnly "com.cleanroommc:sponge-mixin:0.20.12+mixin.0.8.7"
-    compileOnly "zone.rong:mixinbooter:10.7"
+    compileOnly "zone.rong:mixinbooter:${mixinBooterVersion}"
 
     compileOnly files(ae2UelDevJar)
     modRuntimeOnly "curse.maven:ae2-extended-life-570458:6302098"

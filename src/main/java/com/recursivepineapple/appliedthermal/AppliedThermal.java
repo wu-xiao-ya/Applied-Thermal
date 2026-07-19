@@ -23,7 +23,7 @@ public final class AppliedThermal {
     public static final String VERSION = "0.1.0";
     public static final String DEPENDENCIES =
         "required-after:appliedenergistics2;required-after:thermalexpansion;required-after:cofhcore;"
-            + "required-after:thermalfoundation;required-after:mixinbooter@[10.7,);after:flux_applied";
+            + "required-after:thermalfoundation;required-after:mixinbooter@[10.0,);after:flux_applied";
 
     public static final Logger LOG = LogManager.getLogger(MOD_ID);
 

@@ -27,10 +27,12 @@ NeoForge implementations.
 | Runtime | Required components |
 | --- | --- |
 | Cleanroom | Cleanroom 0.5.14, AE2UEL v0.56.7, Thermal Expansion 5.5.7 and its CoFH dependencies |
-| Standard Forge | Forge 14.23.5.2859 or newer, MixinBooter 10.7, AE2UEL v0.56.7, Thermal Expansion 5.5.7 and its CoFH dependencies |
+| Standard Forge | Forge 14.23.5.2859 or newer, MixinBooter 10.0 or newer, AE2UEL v0.56.7, Thermal Expansion 5.5.7 and its CoFH dependencies |
 
-MixinBooter 10.7 is included by Cleanroom 0.5.14. It must be installed separately
-when using standard Forge.
+Cleanroom provides the compatible Mixin environment and does not need a separate
+MixinBooter installation. Standard Forge installations must install MixinBooter
+10.0 or newer separately. CI compiles against both 10.0 and 10.7 to preserve the
+supported version range.
 
 ## Soft dependencies
 

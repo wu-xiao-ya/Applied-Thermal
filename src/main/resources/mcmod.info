@@ -16,7 +16,7 @@
       "required-after:thermalexpansion",
       "required-after:cofhcore",
       "required-after:thermalfoundation",
-      "required-after:mixinbooter@[10.7,)",
+      "required-after:mixinbooter@[10.0,)",
       "after:flux_applied"
     ]
   }

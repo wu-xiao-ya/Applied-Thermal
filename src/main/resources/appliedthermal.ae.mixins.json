@@ -13,7 +13,8 @@
   ],
   "client": [
     "MixinGuiInterface",
-    "MixinGuiUpgradeable"
+    "MixinGuiUpgradeable",
+    "MixinMouseTweaksGuiContainer2Handler"
   ],
   "injectors": {
     "defaultRequire": 1
