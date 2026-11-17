@@ -6,6 +6,7 @@ plugins {
 
 group = mod_group
 version = mod_version
+def ae2sVersion = "1.1.2"
 
 base {
     archivesName = mod_archives_name
@@ -68,8 +69,8 @@ repositories {
         }
     }
     ivy {
-        name = "AE2SDevRelease"
-        url = uri("https://github.com/FormlessDragon/Applied-Energistics-2-Supergiant/releases/download/dev")
+        name = "AE2SRelease"
+        url = uri("https://github.com/FormlessDragon/Applied-Energistics-2-Supergiant/releases/download/v${ae2sVersion}")
         patternLayout {
             artifact("[artifact]-[revision](-[classifier]).[ext]")
         }
@@ -127,7 +128,7 @@ dependencies {
     compileOnly "com.cleanroommc:sponge-mixin:0.20.12+mixin.0.8.7"
     compileOnly "zone.rong:mixinbooter:10.7"
 
-    modCompileOnly "dev.ae2s:AppliedEnergistics2-Supergiant:1.0.9+278077b98:dev@jar"
+    modCompileOnly "dev.ae2s:AppliedEnergistics2-Supergiant:${ae2sVersion}:dev@jar"
     modCompileOnly "curse.maven:CoFHCore-69162:2920433"
     modCompileOnly "curse.maven:ThermalFoundation-222880:2926428"
     modCompileOnly "curse.maven:ThermalExpansion-69163:2926431"

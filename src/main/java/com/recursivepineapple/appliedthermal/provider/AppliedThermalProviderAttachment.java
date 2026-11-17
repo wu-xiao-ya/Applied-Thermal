@@ -16,6 +16,7 @@ import ae2.api.networking.storage.IStorageService;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
+import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
 import ae2.api.storage.StorageHelper;
@@ -33,6 +34,7 @@ import cofh.thermalexpansion.block.machine.TileMachineBase;
 import com.recursivepineapple.appliedthermal.integration.appflux.AppFluxCompat;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import com.recursivepineapple.appliedthermal.init.ATItems;
+import com.recursivepineapple.appliedthermal.mixin.PatternProviderLogicInvoker;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -353,6 +355,12 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
         saveChanges();
     }
 
+    public void updateRedstoneState() {
+        if (enabled && tile.getWorld() != null && !tile.getWorld().isRemote) {
+            logic.updateRedstoneState();
+        }
+    }
+
     public void tryReturnOutputsToNetwork() {
         if (!enabled || !returnOutputsToNetwork || tile.getWorld() == null || tile.getWorld().isRemote) {
             return;
@@ -391,6 +399,8 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
             ItemStack remaining = stack.copy();
             remaining.shrink((int) Math.min(inserted, Integer.MAX_VALUE));
             tile.setInventorySlotContents(slot, remaining.isEmpty() ? ItemStack.EMPTY : remaining);
+            ((PatternProviderLogicInvoker) logic)
+                .appliedthermal$onStackReturnedToNetwork(new GenericStack(key, inserted));
             tile.markDirty();
         }
     }

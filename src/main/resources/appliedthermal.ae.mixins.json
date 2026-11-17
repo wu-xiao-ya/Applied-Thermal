@@ -6,7 +6,8 @@
   "plugin": "com.recursivepineapple.appliedthermal.core.AppliedThermalMixinPlugin",
   "mixins": [
     "MixinAEGuiHandler",
-    "MixinMouseTweaksGuiContainer2"
+    "MixinMouseTweaksGuiContainer2",
+    "PatternProviderLogicInvoker"
   ],
   "client": [],
   "injectors": {

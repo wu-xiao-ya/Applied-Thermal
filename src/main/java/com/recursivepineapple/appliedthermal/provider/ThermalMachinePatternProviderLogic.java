@@ -2,6 +2,7 @@ package com.recursivepineapple.appliedthermal.provider;
 
 import ae2.api.config.Actionable;
 import ae2.api.config.BlockingMode;
+import ae2.api.config.LockCraftingMode;
 import ae2.api.config.PatternProviderBlockingType;
 import ae2.api.config.Settings;
 import ae2.api.crafting.IPatternDetails;
@@ -12,6 +13,7 @@ import ae2.crafting.pattern.AEProcessingPattern;
 import ae2.helpers.patternprovider.PatternProviderLogic;
 import ae2.helpers.patternprovider.PatternProviderLogicHost;
 import ae2.helpers.patternprovider.PseudoPatternDetails;
+import com.recursivepineapple.appliedthermal.mixin.PatternProviderLogicInvoker;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import net.minecraft.item.Item;
 
@@ -38,6 +40,9 @@ public final class ThermalMachinePatternProviderLogic extends PatternProviderLog
         if (!(basePatternDetails instanceof AEProcessingPattern) || multiplier != 1) {
             return false;
         }
+        if (getCraftingLockedReason() != LockCraftingMode.NONE) {
+            return false;
+        }
         if (isBlocked(basePatternDetails, inputHolder)) {
             return false;
         }
@@ -48,6 +53,8 @@ public final class ThermalMachinePatternProviderLogic extends PatternProviderLog
             (what, amount) -> attachment.insertInput(what, amount, Actionable.MODULATE));
         this.hasLastSuccessfulPatternHash = true;
         this.lastSuccessfulPatternHash = getPatternHash(basePatternDetails);
+        ((PatternProviderLogicInvoker) (PatternProviderLogic) this)
+            .appliedthermal$onPushPatternSuccess(basePatternDetails);
         saveChanges();
         return true;
     }
