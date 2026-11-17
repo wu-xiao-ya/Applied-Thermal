@@ -1,11 +1,9 @@
 package com.recursivepineapple.appliedthermal.network;
 
-import ae2.container.implementations.ContainerPatternProvider;
-import ae2.client.gui.implementations.GuiPatternProvider;
-import ae2.client.gui.style.GuiStyleManager;
-import ae2.helpers.patternprovider.PatternProviderLogicHost;
+import ae2.core.gui.PatternContainerGuiReturnContext;
 import cofh.thermalexpansion.block.machine.TileMachineBase;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
+import com.recursivepineapple.appliedthermal.client.gui.GuiThermalPatternProvider;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
@@ -23,10 +21,8 @@ public final class ATGuiHandler implements IGuiHandler {
             return null;
         }
         if (id == ATGuiIds.PATTERN_PROVIDER) {
-            if (!(machine instanceof PatternProviderLogicHost)) {
-                return null;
-            }
-            return new ContainerPatternProvider(player.inventory, (PatternProviderLogicHost) machine);
+            ContainerThermalPatternProvider container = new ContainerThermalPatternProvider(player.inventory, machine);
+            return PatternContainerGuiReturnContext.initializeContainer(container);
         }
         return null;
     }
@@ -39,13 +35,8 @@ public final class ATGuiHandler implements IGuiHandler {
             return null;
         }
         if (id == ATGuiIds.PATTERN_PROVIDER) {
-            if (!(machine instanceof PatternProviderLogicHost)) {
-                return null;
-            }
-            ContainerPatternProvider container =
-                new ContainerPatternProvider(player.inventory, (PatternProviderLogicHost) machine);
-            return new GuiPatternProvider(container, player.inventory, null,
-                GuiStyleManager.loadStyleDoc("/screens/pattern_provider.json"));
+            ContainerThermalPatternProvider container = new ContainerThermalPatternProvider(player.inventory, machine);
+            return new GuiThermalPatternProvider(container, player.inventory);
         }
         return null;
     }
@@ -59,6 +50,7 @@ public final class ATGuiHandler implements IGuiHandler {
             return null;
         }
         AppliedThermalMachine machine = (AppliedThermalMachine) tile;
-        return machine.appliedthermal$hasPatternProviderAugment() ? machine : null;
+        return machine.appliedthermal$hasPatternProviderAugment()
+            && machine.appliedthermal$getProviderAttachment().isEnabled() ? machine : null;
     }
 }

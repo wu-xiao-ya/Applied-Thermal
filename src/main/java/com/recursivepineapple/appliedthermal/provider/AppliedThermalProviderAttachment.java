@@ -10,21 +10,17 @@ import ae2.api.networking.IGridNode;
 import ae2.api.networking.IGridNodeListener;
 import ae2.api.networking.IInWorldGridNodeHost;
 import ae2.api.networking.IManagedGridNode;
-import ae2.api.networking.crafting.ICraftingProvider;
 import ae2.api.networking.security.IActionHost;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.networking.storage.IStorageService;
 import ae2.api.orientation.BlockOrientation;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
-import ae2.api.stacks.GenericStack;
 import ae2.api.stacks.KeyCounter;
 import ae2.api.storage.MEStorage;
 import ae2.api.storage.StorageHelper;
 import ae2.api.upgrades.IUpgradeInventory;
 import ae2.api.util.AECableType;
-import ae2.helpers.patternprovider.PatternProviderLogic;
-import ae2.helpers.patternprovider.PatternProviderLogicHost;
 import ae2.util.Platform;
 import cofh.core.block.TileReconfigurable;
 import cofh.core.block.TilePowered;
@@ -32,25 +28,25 @@ import cofh.core.util.core.SlotConfig;
 import cofh.core.util.helpers.ItemHelper;
 import cofh.thermalexpansion.block.machine.BlockMachine;
 import cofh.thermalexpansion.block.machine.TileMachineBase;
+import com.recursivepineapple.appliedthermal.AppliedThermal;
 import com.recursivepineapple.appliedthermal.integration.appflux.AppFluxCompat;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import com.recursivepineapple.appliedthermal.init.ATItems;
-import com.recursivepineapple.appliedthermal.mixin.PatternProviderLogicInvoker;
+import com.recursivepineapple.appliedthermal.network.ATGuiIds;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import net.minecraft.util.text.TextComponentString;
 
-public final class AppliedThermalProviderAttachment implements PatternProviderLogicHost, IActionHost,
-    IInWorldGridNodeHost {
+public final class AppliedThermalProviderAttachment implements IActionHost, IInWorldGridNodeHost {
 
     private static final String TAG_ROOT = "AppliedThermalProvider";
     private static final String TAG_RETURN_OUTPUTS = "ReturnOutputsToNetwork";
@@ -60,7 +56,7 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
 
     private final TileMachineBase tile;
     private IManagedGridNode mainNode;
-    private PatternProviderLogic logic;
+    private ThermalMachinePatternProviderLogic logic;
     private boolean loaded;
     private boolean enabled;
     @Nullable
@@ -83,14 +79,9 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
             .setTagName("appliedthermal");
     }
 
-    private PatternProviderLogic createLogic(IManagedGridNode node) {
-        PatternProviderLogicHost host = tile instanceof PatternProviderLogicHost ? (PatternProviderLogicHost) tile : this;
-        return new ThermalMachinePatternProviderLogic(node, host, ATItems.getPatternProviderAugment(), 36, this);
-    }
-
     private void rebuildAeState() {
         this.mainNode = createManagedNode();
-        this.logic = createLogic(this.mainNode);
+        this.logic = new ThermalMachinePatternProviderLogic(this.mainNode, 36, this);
         applySavedProviderState();
     }
 
@@ -213,52 +204,35 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
         }
     }
 
-    @Override
-    public PatternProviderLogic getLogic() {
+    public ThermalMachinePatternProviderLogic getLogic() {
         return logic;
     }
 
-    @Override
-    public TileEntity getTileEntity() {
+    public TileMachineBase getTileEntity() {
         return tile;
     }
 
-    @Override
-    public EnumSet<EnumFacing> getTargets() {
-        return EnumSet.allOf(EnumFacing.class);
+    public void openGui(EntityPlayer player) {
+        if (!enabled || tile.isInvalid() || tile.getWorld() != player.world || player.world.isRemote
+            || !tile.canPlayerAccess(player)) {
+            return;
+        }
+        BlockPos pos = tile.getPos();
+        if (player.world.isBlockLoaded(pos) && player.world.getTileEntity(pos) == tile) {
+            player.openGui(AppliedThermal.instance, ATGuiIds.PATTERN_PROVIDER, player.world,
+                pos.getX(), pos.getY(), pos.getZ());
+        }
     }
 
-    @Override
-    public boolean hasCustomName() {
-        return customName != null && !customName.isEmpty();
-    }
-
-    @Override
-    @Nullable
-    public String getCustomName() {
-        return customName;
-    }
-
-    @Override
     public void setCustomName(@Nullable String name) {
         this.customName = name;
         saveChanges();
     }
 
-    @Override
     public void saveChanges() {
         tile.markDirty();
     }
 
-    @Override
-    public AEItemKey getTerminalIcon() {
-        ItemStack stack = tile.getBlockType() instanceof BlockMachine
-            ? new ItemStack(tile.getBlockType(), 1, tile.getBlockMetadata())
-            : new ItemStack(ATItems.getPatternProviderAugment());
-        return AEItemKey.of(stack);
-    }
-
-    @Override
     public ItemStack getMainContainerIcon() {
         if (tile.getBlockType() instanceof BlockMachine) {
             return new ItemStack(tile.getBlockType(), 1, tile.getBlockMetadata());
@@ -266,19 +240,17 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
         return new ItemStack(ATItems.getPatternProviderAugment());
     }
 
-    @Override
     public PatternContainerGroup getTerminalGroup() {
-        AEItemKey icon = getTerminalIcon();
-        ITextComponent name = tile.getDisplayName();
+        AEItemKey icon = AEItemKey.of(getMainContainerIcon());
+        ITextComponent name = customName == null || customName.isEmpty()
+            ? tile.getDisplayName() : new TextComponentString(customName);
         return new PatternContainerGroup(icon, name, java.util.Collections.emptyList());
     }
 
-    @Override
     public IUpgradeInventory getUpgrades() {
         return this.logic.getUpgrades();
     }
 
-    @Override
     @Nullable
     public IGrid getGrid() {
         return logic.getGrid();
@@ -303,46 +275,6 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
     @Override
     public AECableType getCableConnectionType(EnumFacing dir) {
         return enabled ? AECableType.SMART : AECableType.NONE;
-    }
-
-    public long insertInput(AEKey what, long amount, Actionable action) {
-        if (!(what instanceof AEItemKey) || amount <= 0 || amount > Integer.MAX_VALUE) {
-            return 0;
-        }
-        AEItemKey itemKey = (AEItemKey) what;
-        ItemStack stack = itemKey.toStack((int) amount);
-        ItemStack simulated = stack.copy();
-        int inserted = 0;
-        for (int slot = 0; slot < tile.getSizeInventory() && inserted < amount; slot++) {
-            if (!isInputSlot(slot) || !tile.isItemValidForSlot(slot, simulated)) {
-                continue;
-            }
-            ItemStack existing = tile.getStackInSlot(slot);
-            if (existing.isEmpty()) {
-                int move = Math.min(simulated.getCount(), simulated.getMaxStackSize());
-                if (action == Actionable.MODULATE) {
-                    ItemStack copy = simulated.copy();
-                    copy.setCount(move);
-                    tile.setInventorySlotContents(slot, copy);
-                }
-                inserted += move;
-                simulated.shrink(move);
-            } else if (ItemHelper.itemsIdentical(existing, simulated)
-                && existing.getCount() < Math.min(existing.getMaxStackSize(), tile.getInventoryStackLimit())) {
-                int move = Math.min(simulated.getCount(),
-                    Math.min(existing.getMaxStackSize(), tile.getInventoryStackLimit()) - existing.getCount());
-                if (action == Actionable.MODULATE) {
-                    existing.grow(move);
-                    tile.setInventorySlotContents(slot, existing);
-                }
-                inserted += move;
-                simulated.shrink(move);
-            }
-        }
-        if (inserted > 0 && action == Actionable.MODULATE) {
-            tile.markDirty();
-        }
-        return inserted;
     }
 
     /**
@@ -441,7 +373,11 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
     }
 
     public void tryReturnOutputsToNetwork() {
-        if (!enabled || !returnOutputsToNetwork || tile.getWorld() == null || tile.getWorld().isRemote) {
+        if (!enabled || tile.getWorld() == null || tile.getWorld().isRemote) {
+            return;
+        }
+        logic.flushReturnInventory();
+        if (!returnOutputsToNetwork) {
             return;
         }
         IGrid grid = getGrid();
@@ -478,8 +414,7 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
             ItemStack remaining = stack.copy();
             remaining.shrink((int) Math.min(inserted, Integer.MAX_VALUE));
             tile.setInventorySlotContents(slot, remaining.isEmpty() ? ItemStack.EMPTY : remaining);
-            ((PatternProviderLogicInvoker) logic)
-                .appliedthermal$onStackReturnedToNetwork(new GenericStack(key, inserted));
+            logic.notifyStackReturnedToNetwork(key, inserted);
             tile.markDirty();
         }
     }
@@ -548,17 +483,6 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
         return slotConfigField;
     }
 
-    public boolean acceptsAny(KeyCounter[] inputs) {
-        for (KeyCounter counter : inputs) {
-            for (Object2LongMap.Entry<AEKey> ignored : counter) {
-                if (ignored.getLongValue() > 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     public boolean containsAnyInput() {
         for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
             if (isInputSlot(slot) && !tile.getStackInSlot(slot).isEmpty()) {
@@ -587,7 +511,6 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
 
     private void refreshProviderState() {
         this.logic.updatePatterns();
-        ICraftingProvider.requestUpdate(this.mainNode);
     }
 
     private static AppliedThermalProviderAttachment getAttachment(TileMachineBase tile) {

@@ -29,12 +29,6 @@ public final class AppliedThermalMixinPlugin implements IMixinConfigPlugin {
             return "yalter.mousetweaks.api.IMTModGuiContainer2".equals(targetClassName)
                 && !targetClassHasMethod(targetClassName, "MT_isMouseTweaksDisabled", "()Z");
         }
-        if ("ae2.core.gui.AEGuiHandler".equals(targetClassName)
-            || "ae2.client.gui.implementations.GuiPatternProvider".equals(targetClassName)
-            || "ae2.container.implementations.ContainerPatternProvider".equals(targetClassName)
-            || "ae2.helpers.patternprovider.PatternProviderLogic".equals(targetClassName)) {
-            return true;
-        }
         return "cofh.thermalexpansion.block.machine.TileMachineBase".equals(targetClassName)
             || "cofh.core.block.TileCore".equals(targetClassName)
             || "cofh.core.block.TilePowered".equals(targetClassName)

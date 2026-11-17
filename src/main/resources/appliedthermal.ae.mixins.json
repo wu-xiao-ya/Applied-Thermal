@@ -5,14 +5,7 @@
   "compatibilityLevel": "JAVA_8",
   "plugin": "com.recursivepineapple.appliedthermal.core.AppliedThermalMixinPlugin",
   "mixins": [
-    "MixinAEGuiHandler",
-    "MixinContainerPatternProvider",
-    "MixinMouseTweaksGuiContainer2",
-    "MixinPatternProviderLogic",
-    "PatternProviderLogicInvoker"
-  ],
-  "client": [
-    "MixinGuiPatternProvider"
+    "MixinMouseTweaksGuiContainer2"
   ],
   "injectors": {
     "defaultRequire": 1

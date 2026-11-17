@@ -1,6 +1,5 @@
 package com.recursivepineapple.appliedthermal.network;
 
-import com.recursivepineapple.appliedthermal.AppliedThermal;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -37,14 +36,14 @@ public final class MessageOpenPatternProviderGui implements IMessage {
         public IMessage onMessage(MessageOpenPatternProviderGui message, MessageContext ctx) {
             EntityPlayerMP player = ctx.getServerHandler().player;
             player.getServerWorld().addScheduledTask(() -> {
-                if (message.pos == null || player.getDistanceSq(message.pos) > 64.0D) {
+                if (message.pos == null || player.getDistanceSq(message.pos) > 64.0D
+                    || !player.world.isBlockLoaded(message.pos)) {
                     return;
                 }
                 TileEntity tile = player.world.getTileEntity(message.pos);
                 if (tile instanceof AppliedThermalMachine
                     && ((AppliedThermalMachine) tile).appliedthermal$hasPatternProviderAugment()) {
-                    player.openGui(AppliedThermal.instance, ATGuiIds.PATTERN_PROVIDER, player.world,
-                        message.pos.getX(), message.pos.getY(), message.pos.getZ());
+                    ((AppliedThermalMachine) tile).appliedthermal$getProviderAttachment().openGui(player);
                 }
             });
             return null;

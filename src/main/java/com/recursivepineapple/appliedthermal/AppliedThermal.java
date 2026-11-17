@@ -22,9 +22,9 @@ public final class AppliedThermal {
 
     public static final String MOD_ID = "appliedthermal";
     public static final String MOD_NAME = "Applied Thermal | 应用热力";
-    public static final String VERSION = "0.1.1";
+    public static final String VERSION = "0.1.2";
     public static final String DEPENDENCIES =
-        "required-after:ae2;required-after:thermalexpansion;required-after:cofhcore;required-after:thermalfoundation;"
+        "required-after:ae2@[1.1.2,);required-after:thermalexpansion;required-after:cofhcore;required-after:thermalfoundation;"
             + "after:appflux";
 
     public static final Logger LOG = LogManager.getLogger(MOD_ID);

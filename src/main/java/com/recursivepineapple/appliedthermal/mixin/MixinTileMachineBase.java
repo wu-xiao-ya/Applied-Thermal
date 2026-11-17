@@ -1,15 +1,18 @@
 package com.recursivepineapple.appliedthermal.mixin;
 
+import ae2.api.config.Settings;
+import ae2.api.config.YesNo;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
+import ae2.api.inventories.InternalInventory;
 import ae2.api.networking.IGrid;
 import ae2.api.networking.IGridNode;
 import ae2.api.networking.IInWorldGridNodeHost;
 import ae2.api.networking.security.IActionHost;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.upgrades.IUpgradeInventory;
+import ae2.api.upgrades.IUpgradeableObject;
 import ae2.api.util.AECableType;
-import ae2.helpers.patternprovider.PatternProviderLogic;
-import ae2.helpers.patternprovider.PatternProviderLogicHost;
+import ae2.helpers.patternprovider.PatternContainer;
 import cofh.api.core.IAugmentable;
 import cofh.core.util.helpers.AugmentHelper;
 import cofh.thermalexpansion.block.machine.TileMachineBase;
@@ -17,11 +20,10 @@ import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalF
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import com.recursivepineapple.appliedthermal.integration.thermal.ThermalMachineAugments;
 import com.recursivepineapple.appliedthermal.provider.AppliedThermalProviderAttachment;
-import java.util.EnumSet;
 import javax.annotation.Nullable;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -31,8 +33,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = TileMachineBase.class, remap = false)
-public abstract class MixinTileMachineBase implements AppliedThermalMachine, PatternProviderLogicHost, IActionHost,
-    IInWorldGridNodeHost {
+public abstract class MixinTileMachineBase implements AppliedThermalMachine, PatternContainer, IActionHost,
+    IInWorldGridNodeHost, IUpgradeableObject {
 
     @Unique
     private final AppliedThermalProviderAttachment appliedthermal$provider =
@@ -73,49 +75,51 @@ public abstract class MixinTileMachineBase implements AppliedThermalMachine, Pat
     }
 
     @Override
-    public PatternProviderLogic getLogic() {
-        return appliedthermal$provider.getLogic();
+    public InternalInventory getTerminalPatternInventory() {
+        return appliedthermal$provider.getLogic().getTerminalPatternInv();
     }
 
     @Override
-    public TileEntity getTileEntity() {
-        return (TileEntity) (Object) this;
+    public boolean containsPattern(AEItemKey pattern) {
+        return appliedthermal$provider.getLogic().containsPattern(pattern);
     }
 
     @Override
-    public EnumSet<EnumFacing> getTargets() {
-        return appliedthermal$provider.getTargets();
+    public boolean isVisibleInTerminal() {
+        return appliedthermal$provider.isEnabled()
+            && appliedthermal$provider.getLogic().getConfigManager().getSetting(Settings.PATTERN_ACCESS_TERMINAL)
+                == YesNo.YES;
     }
 
     @Override
-    public boolean hasCustomName() {
-        return appliedthermal$provider.hasCustomName();
+    public long getTerminalSortOrder() {
+        return appliedthermal$provider.getTileEntity().getPos().toLong();
     }
 
     @Override
-    @Nullable
-    public String getCustomName() {
-        return appliedthermal$provider.getCustomName();
+    public boolean canEditTerminalName() {
+        return true;
     }
 
     @Override
-    public void setCustomName(@Nullable String name) {
+    public void setTerminalCustomName(@Nullable String name) {
         appliedthermal$provider.setCustomName(name);
     }
 
     @Override
-    public void saveChanges() {
-        appliedthermal$provider.saveChanges();
+    public boolean canModifyTerminalVisibility() {
+        return true;
     }
 
     @Override
-    public AEItemKey getTerminalIcon() {
-        return appliedthermal$provider.getTerminalIcon();
+    public void setTerminalVisibility(boolean visible) {
+        appliedthermal$provider.getLogic().getConfigManager().putSetting(Settings.PATTERN_ACCESS_TERMINAL,
+            visible ? YesNo.YES : YesNo.NO);
     }
 
     @Override
-    public ItemStack getMainContainerIcon() {
-        return appliedthermal$provider.getMainContainerIcon();
+    public void openTerminalPatternContainerGui(EntityPlayer player) {
+        appliedthermal$provider.openGui(player);
     }
 
     @Override

@@ -135,6 +135,7 @@ dependencies {
     modCompileOnly "cofh:RedstoneFlux:1.12-2.1.0.+:universal"
     modCompileOnly "curse.maven:codechicken-lib-1-8-242818:2779848"
     modCompileOnly "mezz:jei:4.31.2"
+    compileOnly "curse.maven:mouse-tweaks-60089:3359843"
 }
 
 processResources {

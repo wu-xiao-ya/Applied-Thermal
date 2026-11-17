@@ -1,0 +1,29 @@
+{
+  "includes": ["common/common.json", "common/player_inventory.json"],
+  "background": {
+    "texture": "guis/pattern_provider.png",
+    "srcRect": [0, 0, 176, 245]
+  },
+  "slots": {
+    "ENCODED_PATTERN": { "left": 8, "top": 42, "grid": "BREAK_AFTER_9COLS" },
+    "STORAGE": { "left": 8, "top": 127, "grid": "HORIZONTAL" }
+  },
+  "widgets": {
+    "priority": { "left": 8, "top": 145, "width": 160, "height": 16 },
+    "priorityInput": { "left": 80, "top": 145, "width": 88, "height": 16 }
+  },
+  "text": {
+    "dialog_title": {
+      "text": { "translate": "gui.appliedthermal.pattern_provider" },
+      "position": { "left": 8, "top": 6 }
+    },
+    "interface_config": {
+      "text": { "translate": "gui.ae2.Patterns" },
+      "position": { "left": 8, "top": 31 }
+    },
+    "interface_stored_items": {
+      "text": { "translate": "gui.ae2.ReturnInventory" },
+      "position": { "left": 8, "top": 116 }
+    }
+  }
+}
