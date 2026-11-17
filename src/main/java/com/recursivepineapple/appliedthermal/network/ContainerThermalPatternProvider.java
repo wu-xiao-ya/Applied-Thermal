@@ -23,7 +23,7 @@ import it.unimi.dsi.fastutil.shorts.ShortSet;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.inventory.InventoryPlayer;
+import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;

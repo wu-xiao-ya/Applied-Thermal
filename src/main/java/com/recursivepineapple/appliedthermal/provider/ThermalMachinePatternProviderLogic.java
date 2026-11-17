@@ -177,7 +177,7 @@ public final class ThermalMachinePatternProviderLogic implements ICraftingProvid
 
     private void setUnlockStack(@Nullable GenericStack stack) {
         unlockStack = stack;
-        unlockKey = stack == null ? null : GenericStack.readWhat(GenericStack.writeTag(stack));
+        unlockKey = stack == null ? null : stack.what();
     }
 
     public void notifyStackReturnedToNetwork(AEKey key, long amount) {
@@ -200,12 +200,8 @@ public final class ThermalMachinePatternProviderLogic implements ICraftingProvid
         }
         IGrid grid = getGrid();
         if (grid != null) {
-            returnInventory.injectIntoNetwork(grid.getStorageService().getInventory(), returnSource, returned -> {
-                AEKey key = GenericStack.readWhat(GenericStack.writeTag(returned));
-                if (key != null) {
-                    notifyStackReturnedToNetwork(key, GenericStack.getStackSizeOrZero(returned));
-                }
-            });
+            returnInventory.injectIntoNetwork(grid.getStorageService().getInventory(), returnSource,
+                returned -> notifyStackReturnedToNetwork(returned.what(), returned.amount()));
             restoreRecoveredInputs(grid);
         }
     }
@@ -214,11 +210,8 @@ public final class ThermalMachinePatternProviderLogic implements ICraftingProvid
         ListIterator<GenericStack> entries = recoveredInputs.listIterator();
         while (entries.hasNext()) {
             GenericStack stack = entries.next();
-            AEKey key = GenericStack.readWhat(GenericStack.writeTag(stack));
-            long amount = GenericStack.getStackSizeOrZero(stack);
-            if (key == null) {
-                continue;
-            }
+            AEKey key = stack.what();
+            long amount = stack.amount();
             long inserted = StorageHelper.poweredInsert(grid.getEnergyService(),
                 grid.getStorageService().getInventory(), key, amount, returnSource, Actionable.MODULATE);
             if (inserted > 0) {
@@ -405,10 +398,7 @@ public final class ThermalMachinePatternProviderLogic implements ICraftingProvid
         if (tile.getWorld() != null) {
             returnInventory.addDrops(drops, tile.getWorld(), tile.getPos());
             for (GenericStack stack : recoveredInputs) {
-                AEKey key = GenericStack.readWhat(GenericStack.writeTag(stack));
-                if (key != null) {
-                    key.addDrops(GenericStack.getStackSizeOrZero(stack), drops, tile.getWorld(), tile.getPos());
-                }
+                stack.what().addDrops(stack.amount(), drops, tile.getWorld(), tile.getPos());
             }
         }
     }
