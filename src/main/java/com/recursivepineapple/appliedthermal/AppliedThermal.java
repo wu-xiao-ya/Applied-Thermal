@@ -35,7 +35,7 @@ public final class AppliedThermal {
     @EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         ATItems.preInit();
-        ATNetwork.preInit(event.getSide());
+        ATNetwork.preInit();
         NetworkRegistry.INSTANCE.registerGuiHandler(instance, new ATGuiHandler());
     }
 

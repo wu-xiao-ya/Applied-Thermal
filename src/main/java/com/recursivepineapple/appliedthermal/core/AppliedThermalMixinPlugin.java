@@ -31,6 +31,7 @@ public final class AppliedThermalMixinPlugin implements IMixinConfigPlugin {
         }
         if ("ae2.core.gui.AEGuiHandler".equals(targetClassName)
             || "ae2.client.gui.implementations.GuiPatternProvider".equals(targetClassName)
+            || "ae2.container.implementations.ContainerPatternProvider".equals(targetClassName)
             || "ae2.helpers.patternprovider.PatternProviderLogic".equals(targetClassName)) {
             return true;
         }
@@ -38,7 +39,6 @@ public final class AppliedThermalMixinPlugin implements IMixinConfigPlugin {
             || "cofh.core.block.TileCore".equals(targetClassName)
             || "cofh.core.block.TilePowered".equals(targetClassName)
             || "cofh.thermalexpansion.block.machine.BlockMachine".equals(targetClassName)
-            || "cofh.core.gui.container.ContainerTileAugmentable".equals(targetClassName)
             || "cofh.thermalexpansion.gui.client.GuiPoweredBase".equals(targetClassName);
     }
 

@@ -12,13 +12,8 @@ public final class ATNetwork {
     private ATNetwork() {
     }
 
-    public static void preInit(Side side) {
-        CHANNEL.registerMessage(MessageToggleOutputReturn.Handler.class, MessageToggleOutputReturn.class, 0,
-            Side.SERVER);
+    public static void preInit() {
         CHANNEL.registerMessage(MessageOpenPatternProviderGui.Handler.class, MessageOpenPatternProviderGui.class, 2,
             Side.SERVER);
-        if (side.isClient()) {
-            CHANNEL.registerMessage(MessageSyncSettings.Handler.class, MessageSyncSettings.class, 1, Side.CLIENT);
-        }
     }
 }

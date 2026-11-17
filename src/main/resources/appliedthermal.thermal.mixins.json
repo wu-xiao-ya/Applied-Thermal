@@ -8,8 +8,7 @@
     "MixinTileMachineBase",
     "MixinTileCore",
     "MixinTilePowered",
-    "MixinBlockMachine",
-    "MixinContainerTileAugmentable"
+    "MixinBlockMachine"
   ],
   "client": [
     "MixinGuiPoweredBase"

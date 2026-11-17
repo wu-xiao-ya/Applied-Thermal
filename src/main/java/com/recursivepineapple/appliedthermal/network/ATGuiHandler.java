@@ -7,7 +7,6 @@ import ae2.helpers.patternprovider.PatternProviderLogicHost;
 import cofh.thermalexpansion.block.machine.TileMachineBase;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -26,12 +25,6 @@ public final class ATGuiHandler implements IGuiHandler {
         if (id == ATGuiIds.PATTERN_PROVIDER) {
             if (!(machine instanceof PatternProviderLogicHost)) {
                 return null;
-            }
-            if (player instanceof EntityPlayerMP) {
-                ATNetwork.CHANNEL.sendTo(
-                    new MessageSyncSettings(new BlockPos(x, y, z),
-                        machine.appliedthermal$getProviderAttachment().shouldReturnOutputsToNetwork()),
-                    (EntityPlayerMP) player);
             }
             return new ContainerPatternProvider(player.inventory, (PatternProviderLogicHost) machine);
         }
