@@ -1,6 +1,7 @@
 package com.recursivepineapple.appliedthermal.provider;
 
 import ae2.api.config.Actionable;
+import ae2.api.crafting.IPatternDetails;
 import ae2.api.implementations.blockentities.PatternContainerGroup;
 import ae2.api.networking.GridFlags;
 import ae2.api.networking.GridHelper;
@@ -39,6 +40,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.function.BiConsumer;
 import javax.annotation.Nullable;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -343,6 +345,79 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
         return inserted;
     }
 
+    /**
+     * Simulates and commits the complete input sequence emitted by an AE processing pattern.
+     * Every request is planned against one shared inventory snapshot, so repeated ingredients
+     * cannot each claim the same free slot capacity.
+     */
+    public boolean pushInputsAtomically(IPatternDetails pattern, KeyCounter[] inputHolder) {
+        List<GenericStack> requests = new ArrayList<>();
+        pattern.pushInputsToExternalInventory(inputHolder,
+            (what, amount) -> requests.add(new GenericStack(what, amount)));
+        if (requests.isEmpty()) {
+            return false;
+        }
+
+        List<ItemStack> plannedSlots = new ArrayList<>(tile.getSizeInventory());
+        for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
+            plannedSlots.add(tile.getStackInSlot(slot).copy());
+        }
+        for (GenericStack request : requests) {
+            if (!applyInputRequest(request.what(), request.amount(), plannedSlots)) {
+                return false;
+            }
+        }
+
+        for (int slot = 0; slot < plannedSlots.size(); slot++) {
+            ItemStack planned = plannedSlots.get(slot);
+            if (!ItemStack.areItemStacksEqual(tile.getStackInSlot(slot), planned)) {
+                tile.setInventorySlotContents(slot, planned);
+            }
+        }
+        tile.markDirty();
+        return true;
+    }
+
+    private boolean applyInputRequest(AEKey what, long amount, List<ItemStack> slots) {
+        if (!(what instanceof AEItemKey) || amount <= 0 || amount > Integer.MAX_VALUE) {
+            return false;
+        }
+        ItemStack remaining = ((AEItemKey) what).toStack((int) amount);
+        if (remaining.isEmpty()) {
+            return false;
+        }
+        // Match existing stacks first so an earlier ingredient cannot consume an empty slot
+        // that is the only valid destination for a later, different ingredient.
+        for (int slot = 0; slot < slots.size() && !remaining.isEmpty(); slot++) {
+            if (!isInputSlot(slot) || !tile.isItemValidForSlot(slot, remaining)) {
+                continue;
+            }
+            ItemStack existing = slots.get(slot);
+            if (existing.isEmpty() || !ItemHelper.itemsIdentical(existing, remaining)) {
+                continue;
+            }
+            int limit = Math.min(remaining.getMaxStackSize(), tile.getInventoryStackLimit());
+            limit = Math.min(limit, existing.getMaxStackSize());
+            int move = Math.min(remaining.getCount(), Math.max(0, limit - existing.getCount()));
+            if (move > 0) {
+                existing.grow(move);
+                remaining.shrink(move);
+            }
+        }
+        for (int slot = 0; slot < slots.size() && !remaining.isEmpty(); slot++) {
+            if (!isInputSlot(slot) || !slots.get(slot).isEmpty() || !tile.isItemValidForSlot(slot, remaining)) {
+                continue;
+            }
+            int move = Math.min(remaining.getCount(),
+                Math.min(remaining.getMaxStackSize(), tile.getInventoryStackLimit()));
+            ItemStack placed = remaining.copy();
+            placed.setCount(move);
+            slots.set(slot, placed);
+            remaining.shrink(move);
+        }
+        return remaining.isEmpty();
+    }
+
     public boolean shouldReturnOutputsToNetwork() {
         return returnOutputsToNetwork;
     }
@@ -353,12 +428,6 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
         }
         this.returnOutputsToNetwork = returnOutputsToNetwork;
         saveChanges();
-    }
-
-    public void updateRedstoneState() {
-        if (enabled && tile.getWorld() != null && !tile.getWorld().isRemote) {
-            logic.updateRedstoneState();
-        }
     }
 
     public void tryReturnOutputsToNetwork() {
@@ -467,17 +536,6 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
             }
         }
         return slotConfigField;
-    }
-
-    public boolean canAcceptInputs(KeyCounter[] inputs) {
-        for (KeyCounter counter : inputs) {
-            for (Object2LongMap.Entry<AEKey> input : counter) {
-                if (insertInput(input.getKey(), input.getLongValue(), Actionable.SIMULATE) < input.getLongValue()) {
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 
     public boolean acceptsAny(KeyCounter[] inputs) {

@@ -30,13 +30,13 @@ public final class AppliedThermalMixinPlugin implements IMixinConfigPlugin {
                 && !targetClassHasMethod(targetClassName, "MT_isMouseTweaksDisabled", "()Z");
         }
         if ("ae2.core.gui.AEGuiHandler".equals(targetClassName)
+            || "ae2.client.gui.implementations.GuiPatternProvider".equals(targetClassName)
             || "ae2.helpers.patternprovider.PatternProviderLogic".equals(targetClassName)) {
             return true;
         }
         return "cofh.thermalexpansion.block.machine.TileMachineBase".equals(targetClassName)
             || "cofh.core.block.TileCore".equals(targetClassName)
             || "cofh.core.block.TilePowered".equals(targetClassName)
-            || "cofh.core.block.TileRSControl".equals(targetClassName)
             || "cofh.thermalexpansion.block.machine.BlockMachine".equals(targetClassName)
             || "cofh.core.gui.container.ContainerTileAugmentable".equals(targetClassName)
             || "cofh.thermalexpansion.gui.client.GuiPoweredBase".equals(targetClassName);

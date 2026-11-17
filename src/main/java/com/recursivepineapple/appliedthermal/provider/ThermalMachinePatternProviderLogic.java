@@ -1,6 +1,5 @@
 package com.recursivepineapple.appliedthermal.provider;
 
-import ae2.api.config.Actionable;
 import ae2.api.config.BlockingMode;
 import ae2.api.config.LockCraftingMode;
 import ae2.api.config.PatternProviderBlockingType;
@@ -46,11 +45,9 @@ public final class ThermalMachinePatternProviderLogic extends PatternProviderLog
         if (isBlocked(basePatternDetails, inputHolder)) {
             return false;
         }
-        if (!attachment.canAcceptInputs(inputHolder)) {
+        if (!attachment.pushInputsAtomically(basePatternDetails, inputHolder)) {
             return false;
         }
-        basePatternDetails.pushInputsToExternalInventory(inputHolder,
-            (what, amount) -> attachment.insertInput(what, amount, Actionable.MODULATE));
         this.hasLastSuccessfulPatternHash = true;
         this.lastSuccessfulPatternHash = getPatternHash(basePatternDetails);
         ((PatternProviderLogicInvoker) (PatternProviderLogic) this)

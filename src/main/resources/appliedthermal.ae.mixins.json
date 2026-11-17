@@ -7,9 +7,12 @@
   "mixins": [
     "MixinAEGuiHandler",
     "MixinMouseTweaksGuiContainer2",
+    "MixinPatternProviderLogic",
     "PatternProviderLogicInvoker"
   ],
-  "client": [],
+  "client": [
+    "MixinGuiPatternProvider"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

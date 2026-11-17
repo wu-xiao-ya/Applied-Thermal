@@ -8,7 +8,6 @@
     "MixinTileMachineBase",
     "MixinTileCore",
     "MixinTilePowered",
-    "MixinTileRSControl",
     "MixinBlockMachine",
     "MixinContainerTileAugmentable"
   ],
