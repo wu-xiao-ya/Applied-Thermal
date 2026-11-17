@@ -9,6 +9,7 @@ import ae2.core.network.InitNetwork;
 import ae2.core.network.serverbound.ConfigValueServerPacket;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
 import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.inventory.GuiContainer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,7 +27,7 @@ public abstract class MixinGuiPatternProvider {
                 + "(Lnet/minecraft/client/gui/GuiButton;)Lnet/minecraft/client/gui/GuiButton;"),
         index = 0)
     private GuiButton appliedthermal$restrictCraftingLockButton(GuiButton original) {
-        ContainerPatternProvider container = ((GuiPatternProvider) (Object) this).getContainer();
+        ContainerPatternProvider container = (ContainerPatternProvider) ((GuiContainer) (Object) this).inventorySlots;
         if (!(container.getHost() instanceof AppliedThermalMachine)) {
             return original;
         }

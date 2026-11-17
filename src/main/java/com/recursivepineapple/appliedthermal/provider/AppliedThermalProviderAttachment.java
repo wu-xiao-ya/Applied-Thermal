@@ -351,9 +351,9 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
      * cannot each claim the same free slot capacity.
      */
     public boolean pushInputsAtomically(IPatternDetails pattern, KeyCounter[] inputHolder) {
-        List<GenericStack> requests = new ArrayList<>();
+        List<InputRequest> requests = new ArrayList<>();
         pattern.pushInputsToExternalInventory(inputHolder,
-            (what, amount) -> requests.add(new GenericStack(what, amount)));
+            (what, amount) -> requests.add(new InputRequest(what, amount)));
         if (requests.isEmpty()) {
             return false;
         }
@@ -362,8 +362,8 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
         for (int slot = 0; slot < tile.getSizeInventory(); slot++) {
             plannedSlots.add(tile.getStackInSlot(slot).copy());
         }
-        for (GenericStack request : requests) {
-            if (!applyInputRequest(request.what(), request.amount(), plannedSlots)) {
+        for (InputRequest request : requests) {
+            if (!applyInputRequest(request.key, request.amount, plannedSlots)) {
                 return false;
             }
         }
@@ -416,6 +416,16 @@ public final class AppliedThermalProviderAttachment implements PatternProviderLo
             remaining.shrink(move);
         }
         return remaining.isEmpty();
+    }
+
+    private static final class InputRequest {
+        private final AEKey key;
+        private final long amount;
+
+        private InputRequest(AEKey key, long amount) {
+            this.key = key;
+            this.amount = amount;
+        }
     }
 
     public boolean shouldReturnOutputsToNetwork() {
