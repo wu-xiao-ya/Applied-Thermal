@@ -8,6 +8,7 @@ tab.appliedthermal.open=Open Window
 tab.appliedthermal.output_return.on=Return On
 tab.appliedthermal.output_return.off=Return Off
 gui.appliedthermal.pattern_provider=Applied Thermal Pattern Provider
+gui.appliedthermal.pattern_provider.machine=%s Pattern Provider
 gui.appliedthermal.patterns=Processing Patterns
 gui.appliedthermal.flux=Applied Thermal Flux Induction
 gui.appliedthermal.flux.card=Induction Card

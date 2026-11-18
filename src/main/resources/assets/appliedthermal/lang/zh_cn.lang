@@ -8,6 +8,7 @@ tab.appliedthermal.open=打开浮窗
 tab.appliedthermal.output_return.on=产物回网: 开
 tab.appliedthermal.output_return.off=产物回网: 关
 gui.appliedthermal.pattern_provider=应用热力样板供应器
+gui.appliedthermal.pattern_provider.machine=%s样板供应器
 gui.appliedthermal.patterns=处理样板
 gui.appliedthermal.flux=应用热力 Flux 感应供能
 gui.appliedthermal.flux.card=感应卡

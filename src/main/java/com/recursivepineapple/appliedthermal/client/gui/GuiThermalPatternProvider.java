@@ -20,8 +20,14 @@ import ae2.core.localization.GuiText;
 import com.recursivepineapple.appliedthermal.network.ContainerThermalPatternProvider;
 import java.util.function.Predicate;
 import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
+import net.minecraft.util.text.TextComponentTranslation;
 
 public final class GuiThermalPatternProvider extends AEBaseGui<ContainerThermalPatternProvider> {
+
+    private static final int TITLE_HORIZONTAL_PADDING = 16;
+    private static final String MACHINE_TITLE = "gui.appliedthermal.pattern_provider.machine";
 
     private final SettingToggleButton<BlockingMode> blockingButton;
     private final SettingToggleButton<PatternProviderBlockingType> blockingTypeButton;
@@ -52,6 +58,25 @@ public final class GuiThermalPatternProvider extends AEBaseGui<ContainerThermalP
         priorityField.setLongValue(menu.priority);
         lastPriority = menu.priority;
         priorityField.setOnChange(() -> priorityField.getIntValue().ifPresent(menu::requestPriority));
+    }
+
+    @Override
+    public void initGui() {
+        super.initGui();
+        ITextComponent machineName = container.getTileEntity().getDisplayName();
+        ITextComponent title = new TextComponentTranslation(MACHINE_TITLE, machineName);
+        int titleWidth = xSize - TITLE_HORIZONTAL_PADDING;
+        if (fontRenderer.getStringWidth(title.getFormattedText()) > titleWidth) {
+            title = machineName;
+            String name = machineName.getFormattedText();
+            if (fontRenderer.getStringWidth(name) > titleWidth) {
+                String ellipsis = "...";
+                title = new TextComponentString(
+                    fontRenderer.trimStringToWidth(name, titleWidth - fontRenderer.getStringWidth(ellipsis))
+                        + ellipsis);
+            }
+        }
+        setTextContent(TEXT_ID_DIALOG_TITLE, title);
     }
 
     @Override
