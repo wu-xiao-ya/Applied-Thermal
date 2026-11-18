@@ -14,6 +14,7 @@ import ae2.api.networking.security.IActionHost;
 import ae2.api.networking.security.IActionSource;
 import ae2.api.networking.storage.IStorageService;
 import ae2.api.orientation.BlockOrientation;
+import ae2.api.stacks.AEFluidKey;
 import ae2.api.stacks.AEItemKey;
 import ae2.api.stacks.AEKey;
 import ae2.api.stacks.KeyCounter;
@@ -24,10 +25,17 @@ import ae2.api.util.AECableType;
 import ae2.util.Platform;
 import cofh.core.block.TileReconfigurable;
 import cofh.core.block.TilePowered;
+import cofh.core.fluid.FluidTankCore;
 import cofh.core.util.core.SlotConfig;
 import cofh.core.util.helpers.ItemHelper;
 import cofh.thermalexpansion.block.machine.BlockMachine;
+import cofh.thermalexpansion.block.machine.TileBrewer;
+import cofh.thermalexpansion.block.machine.TileCentrifuge;
+import cofh.thermalexpansion.block.machine.TileCrucible;
+import cofh.thermalexpansion.block.machine.TileFurnace;
 import cofh.thermalexpansion.block.machine.TileMachineBase;
+import cofh.thermalexpansion.block.machine.TileRefinery;
+import cofh.thermalexpansion.block.machine.TileSawmill;
 import com.recursivepineapple.appliedthermal.AppliedThermal;
 import com.recursivepineapple.appliedthermal.integration.appflux.AppFluxCompat;
 import com.recursivepineapple.appliedthermal.integration.thermal.AppliedThermalMachine;
@@ -45,6 +53,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.ITextComponent;
 import net.minecraft.util.text.TextComponentString;
+import net.minecraftforge.fluids.FluidStack;
 
 public final class AppliedThermalProviderAttachment implements IActionHost, IInWorldGridNodeHost {
 
@@ -417,6 +426,63 @@ public final class AppliedThermalProviderAttachment implements IActionHost, IInW
             logic.notifyStackReturnedToNetwork(key, inserted);
             tile.markDirty();
         }
+        tryReturnFluidOutput(grid, storage, source);
+    }
+
+    private void tryReturnFluidOutput(IGrid grid, MEStorage storage, IActionSource source) {
+        FluidTankCore tank = getFluidOutputTank();
+        if (tank == null) {
+            return;
+        }
+        FluidStack fluid = tank.getFluid();
+        AEFluidKey key = AEFluidKey.of(fluid);
+        if (key == null) {
+            return;
+        }
+        long accepted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, fluid.amount, source,
+            Actionable.SIMULATE);
+        if (accepted <= 0) {
+            return;
+        }
+        FluidStack drained = tank.drain(key.toStack((int) accepted), true);
+        if (drained == null || drained.amount <= 0) {
+            return;
+        }
+        long inserted = StorageHelper.poweredInsert(grid.getEnergyService(), storage, key, drained.amount, source,
+            Actionable.MODULATE);
+        if (inserted < drained.amount) {
+            // Storage can accept less during the real insertion. Put the remainder back in its output tank.
+            tank.fill(new FluidStack(drained, drained.amount - (int) inserted), true);
+        }
+        if (inserted > 0) {
+            tile.markDirty();
+            logic.notifyStackReturnedToNetwork(key, inserted);
+        }
+    }
+
+    @Nullable
+    private FluidTankCore getFluidOutputTank() {
+        // Brewer and Refinery reserve tank 0 for recipe inputs and tank 1 for outputs.
+        if (tile instanceof TileBrewer) {
+            return ((TileBrewer) tile).getTank(1);
+        }
+        if (tile instanceof TileRefinery) {
+            return ((TileRefinery) tile).getTank(1);
+        }
+        if (tile instanceof TileCentrifuge) {
+            return ((TileCentrifuge) tile).getTank();
+        }
+        if (tile instanceof TileCrucible) {
+            return ((TileCrucible) tile).getTank();
+        }
+        if (tile instanceof TileFurnace) {
+            return ((TileFurnace) tile).getTank();
+        }
+        if (tile instanceof TileSawmill) {
+            return ((TileSawmill) tile).getTank();
+        }
+        // The Transposer's shared tank can still hold recipe inputs after switching to extraction mode.
+        return null;
     }
 
     public void tryChargeMachineFromFluxNetwork() {
